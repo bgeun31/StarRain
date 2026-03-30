@@ -5,10 +5,11 @@ import type { MemberView } from '../types'
 interface Props {
   member: MemberView
   currentGuildName: string
+  canEdit: boolean
   onManageGroup: (characterName: string) => void
 }
 
-export default function MemberCard({ member, currentGuildName, onManageGroup }: Props) {
+export default function MemberCard({ member, currentGuildName, canEdit, onManageGroup }: Props) {
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
       <div className="flex items-start gap-3">
@@ -32,6 +33,7 @@ export default function MemberCard({ member, currentGuildName, onManageGroup }: 
         alts={member.alts}
         linkedAltNames={member.linkedAltNames}
         currentGuildName={currentGuildName}
+        canEdit={canEdit}
         onManageAlts={() => onManageGroup(member.characterName)}
       />
     </div>

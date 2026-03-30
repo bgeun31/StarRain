@@ -1,9 +1,10 @@
 /// <reference types="vite/client" />
 import { getApps, initializeApp, type FirebaseApp } from 'firebase/app'
 import { initializeFirestore, getFirestore, type Firestore } from 'firebase/firestore'
+import { getAuth, type Auth } from 'firebase/auth'
 import { getStorage } from 'firebase/storage'
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
@@ -14,17 +15,17 @@ const firebaseConfig = {
 
 let app: FirebaseApp
 let db: Firestore
+let auth: Auth
 
 if (getApps().length === 0) {
-  // 최초 초기화: experimentalForceLongPolling으로 WebSocket Watch Stream 비활성화
-  // → React StrictMode / Vite HMR에서 동시 쿼리 Watch Stream 충돌("Unexpected state") 방지
   app = initializeApp(firebaseConfig)
   db = initializeFirestore(app, { experimentalForceLongPolling: true })
 } else {
-  // HMR로 모듈이 재실행될 때 기존 앱 재사용
   app = getApps()[0]
   db = getFirestore(app)
 }
 
-export { db }
+auth = getAuth(app)
+
+export { db, auth }
 export const storage = getStorage(app)

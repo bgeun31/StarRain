@@ -9,7 +9,9 @@ type SortDir = 'asc' | 'desc'
 interface Props {
   members: MemberView[]
   currentGuildName: string
+  canEdit: boolean
   onManageGroup: (characterName: string) => void
+  onToggleNoble: (characterName: string) => void
 }
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
@@ -19,7 +21,7 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
     : <ChevronDown size={13} className="text-amber-500" />
 }
 
-export default function MemberTable({ members, currentGuildName, onManageGroup }: Props) {
+export default function MemberTable({ members, currentGuildName, canEdit, onManageGroup, onToggleNoble }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('level')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
@@ -62,6 +64,7 @@ export default function MemberTable({ members, currentGuildName, onManageGroup }
               </button>
             </th>
             <th className="px-4 py-3">직업</th>
+            <th className="px-4 py-3 text-center">노블</th>
             <th className="px-4 py-3">상태</th>
             <th className="px-4 py-3">부캐릭터</th>
           </tr>
@@ -74,8 +77,8 @@ export default function MemberTable({ members, currentGuildName, onManageGroup }
             return (
               <tr
                 key={m.characterName}
-                className="hover:bg-amber-50 transition-colors cursor-pointer"
-                onClick={() => onManageGroup(m.characterName)}
+                className={`transition-colors ${canEdit ? 'hover:bg-amber-50 cursor-pointer' : ''}`}
+                onClick={() => canEdit && onManageGroup(m.characterName)}
               >
                 <td className="px-4 py-3 text-center">
                   <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-xs font-bold text-amber-700">
@@ -89,6 +92,24 @@ export default function MemberTable({ members, currentGuildName, onManageGroup }
                   </div>
                 </td>
                 <td className="px-4 py-3 text-gray-500">{m.characterClass}</td>
+                <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                  {canEdit ? (
+                    <button
+                      onClick={() => onToggleNoble(m.characterName)}
+                      className={`inline-flex h-7 w-10 items-center justify-center rounded-full text-xs font-bold transition-colors ${
+                        m.noble
+                          ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
+                          : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                      }`}
+                    >
+                      {m.noble ? 'O' : 'X'}
+                    </button>
+                  ) : (
+                    <span className={`text-xs font-bold ${m.noble ? 'text-amber-600' : 'text-gray-300'}`}>
+                      {m.noble ? 'O' : 'X'}
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   {hasAlts
                     ? <Badge variant="main">부캐 있음</Badge>

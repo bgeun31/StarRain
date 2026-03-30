@@ -1,9 +1,64 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 개발 중에는 모두 허용 (운영 시 인증 기반으로 변경 필요)
-    match /{document=**} {
-      allow read, write: if true;
+
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isViewer() {
+      return isAuthed() && userRole() in ['viewer', 'editor', 'admin'];
+    }
+
+    function isEditor() {
+      return isAuthed() && userRole() in ['editor', 'admin'];
+    }
+
+    function isAdmin() {
+      return isAuthed() && userRole() == 'admin';
+    }
+
+    // 사용자 프로필: 인증된 사용자만 읽기, 관리자만 쓰기
+    // 단, 본인 문서가 아직 없을 때 최초 1회 생성 허용 (부트스트랩)
+    match /users/{uid} {
+      allow read: if isAuthed();
+      allow create: if isAuthed() && uid == request.auth.uid
+                    && !exists(/databases/$(database)/documents/users/$(request.auth.uid));
+      allow update, delete: if isAdmin();
+    }
+
+    // 부캐 링크: 뷰어 이상 읽기, 편집자 이상 쓰기
+    match /altLinks/{document} {
+      allow read: if isViewer();
+      allow write: if isEditor();
+    }
+
+    // 즐겨찾기 길드: 뷰어 이상 읽기, 편집자 이상 쓰기
+    match /savedGuilds/{document} {
+      allow read: if isViewer();
+      allow write: if isEditor();
+    }
+
+    // 길드 멤버 캐시: 뷰어 이상 읽기, 편집자 이상 쓰기
+    match /guildMemberCache/{document} {
+      allow read: if isViewer();
+      allow write: if isEditor();
+    }
+
+    // 캐릭터 캐시: 뷰어 이상 읽기, 편집자 이상 쓰기
+    match /characterCache/{document} {
+      allow read: if isViewer();
+      allow write: if isEditor();
+    }
+
+    // 길드원 부가 데이터 (노블 등): 뷰어 이상 읽기, 편집자 이상 쓰기
+    match /memberData/{document} {
+      allow read: if isViewer();
+      allow write: if isEditor();
     }
   }
 }

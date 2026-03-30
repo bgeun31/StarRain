@@ -7,6 +7,7 @@ import Button from './ui/Button'
 import { fetchGuildId, fetchGuildBasic } from '../services/mapleApiService'
 import { getOrFetchCharacter } from '../services/characterCacheService'
 import { getAltNamesMap } from '../services/altLinkService'
+import { getNobleMap, setNoble } from '../services/memberDataService'
 import {
   getCachedMemberList,
   setCachedMemberList,
@@ -19,6 +20,7 @@ import type { MemberView, NexonGuildBasic } from '../types'
 interface Props {
   guildName: string
   worldName: string
+  canEdit: boolean
 }
 
 function formatAge(ms: number): string {
@@ -28,7 +30,7 @@ function formatAge(ms: number): string {
   return `${Math.floor(min / 60)}시간 전`
 }
 
-export default function MemberList({ guildName, worldName }: Props) {
+export default function MemberList({ guildName, worldName, canEdit }: Props) {
   const [guildInfo, setGuildInfo]       = useState<NexonGuildBasic | null>(null)
   const [members, setMembers]           = useState<MemberView[]>([])
   const [syncing, setSyncing]           = useState(false)
@@ -51,7 +53,10 @@ export default function MemberList({ guildName, worldName }: Props) {
     setSyncedAt(cache.cachedAt.toMillis())
     setFromCache(true)
 
-    const altMap = await getAltNamesMap(cache.memberNames)
+    const [altMap, nobleMap] = await Promise.all([
+      getAltNamesMap(cache.memberNames),
+      getNobleMap(cache.memberNames),
+    ])
     if (signal.aborted) return true
 
     const views: MemberView[] = cache.members.map((m) => ({
@@ -60,6 +65,7 @@ export default function MemberList({ guildName, worldName }: Props) {
       characterLevel: m.characterLevel,
       guildName: m.guildName ?? guildName,
       linkedAltNames: altMap.get(m.characterName) ?? [],
+      noble: nobleMap.get(m.characterName) ?? false,
       isNew: false,
       alts: [],
     }))
@@ -109,7 +115,10 @@ export default function MemberList({ guildName, worldName }: Props) {
 
     const addedSet = new Set(memberDiff.added)
     const total    = currentNames.length
-    const altMap   = await getAltNamesMap(currentNames)
+    const [altMap, nobleMap] = await Promise.all([
+      getAltNamesMap(currentNames),
+      getNobleMap(currentNames),
+    ])
     if (signal.aborted) return
 
     setSyncProgress({ loaded: 0, total })
@@ -146,6 +155,7 @@ export default function MemberList({ guildName, worldName }: Props) {
         characterLevel: info?.character_level ?? 0,
         guildName: info?.character_guild_name ?? guildName,
         linkedAltNames: altNames,
+        noble: nobleMap.get(name) ?? false,
         isNew,
         alts,
       })
@@ -205,6 +215,16 @@ export default function MemberList({ guildName, worldName }: Props) {
   function openAltModal(characterName: string) {
     const member = members.find((m) => m.characterName === characterName)
     setAltModal({ characterName, altNames: member?.linkedAltNames ?? [] })
+  }
+
+  async function handleToggleNoble(characterName: string) {
+    const member = members.find((m) => m.characterName === characterName)
+    if (!member) return
+    const next = !member.noble
+    setMembers((prev) =>
+      prev.map((m) => m.characterName === characterName ? { ...m, noble: next } : m),
+    )
+    await setNoble(characterName, next)
   }
 
   return (
@@ -330,11 +350,11 @@ export default function MemberList({ guildName, worldName }: Props) {
         viewMode === 'card' ? (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {filtered.map((m) => (
-              <MemberCard key={m.characterName} member={m} currentGuildName={guildName} onManageGroup={openAltModal} />
+              <MemberCard key={m.characterName} member={m} currentGuildName={guildName} onManageGroup={openAltModal} canEdit={canEdit} />
             ))}
           </div>
         ) : (
-          <MemberTable members={filtered} currentGuildName={guildName} onManageGroup={openAltModal} />
+          <MemberTable members={filtered} currentGuildName={guildName} onManageGroup={openAltModal} onToggleNoble={handleToggleNoble} canEdit={canEdit} />
         )
       )}
 

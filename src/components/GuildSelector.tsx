@@ -5,7 +5,7 @@ interface Props {
   guilds: SavedGuild[]
   selectedId: string | null
   onSelect: (guild: SavedGuild) => void
-  onRemove: (guild: SavedGuild) => void
+  onRemove?: (guild: SavedGuild) => void
 }
 
 export default function GuildSelector({ guilds, selectedId, onSelect, onRemove }: Props) {
@@ -37,15 +37,17 @@ export default function GuildSelector({ guilds, selectedId, onSelect, onRemove }
                 {g.worldName}
               </p>
             </div>
-            <button
-              onClick={(e) => { e.stopPropagation(); onRemove(g) }}
-              className={`ml-2 shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${
-                selectedId === g.id ? 'hover:bg-amber-600 text-white' : 'hover:bg-red-100 text-red-400'
-              }`}
-              title="즐겨찾기 삭제"
-            >
-              <Trash2 size={14} />
-            </button>
+            {onRemove && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRemove(g) }}
+                className={`ml-2 shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${
+                  selectedId === g.id ? 'hover:bg-amber-600 text-white' : 'hover:bg-red-100 text-red-400'
+                }`}
+                title="즐겨찾기 삭제"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
         </li>
       ))}

@@ -1,5 +1,17 @@
 import { Timestamp } from 'firebase/firestore'
 
+// ─── 사용자 / 권한 타입 ───────────────────────────────────────────────────────
+
+export type UserRole = 'viewer' | 'editor' | 'admin'
+
+export interface UserProfile {
+  uid: string
+  email: string
+  displayName: string
+  role: UserRole
+  createdAt: Timestamp
+}
+
 // ─── Firebase 저장 타입 ────────────────────────────────────────────────────────
 
 /** 즐겨찾기 길드 (Firebase 저장) */
@@ -47,6 +59,7 @@ export interface MemberView {
   characterLevel: number
   guildName: string
   linkedAltNames: string[]  // DB에 저장된 부캐 이름 목록 (비어있으면 미연결)
+  noble: boolean            // 노블레스 여부 (memberData 컬렉션에 저장)
   isNew: boolean            // 이번 로드에서 새로 감지된 신규 가입자
   alts: AltView[]           // Nexon API 조회된 부캐 상세 정보
 }

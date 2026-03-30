@@ -7,10 +7,11 @@ interface Props {
   alts: AltView[]
   linkedAltNames: string[]
   currentGuildName: string
+  canEdit: boolean
   onManageAlts: () => void
 }
 
-export default function AltCharacterPanel({ alts, linkedAltNames, currentGuildName, onManageAlts }: Props) {
+export default function AltCharacterPanel({ alts, linkedAltNames, currentGuildName, canEdit, onManageAlts }: Props) {
   const [open, setOpen] = useState(false)
 
   // 부캐 미등록
@@ -18,13 +19,15 @@ export default function AltCharacterPanel({ alts, linkedAltNames, currentGuildNa
     return (
       <div className="mt-3 border-t border-gray-100 pt-3 flex items-center justify-between">
         <p className="text-xs text-gray-400 italic">부캐릭터 없음</p>
-        <button
-          onClick={onManageAlts}
-          className="flex items-center gap-1 text-xs text-amber-500 hover:text-amber-600"
-        >
-          <Link2 size={12} />
-          부캐 추가
-        </button>
+        {canEdit && (
+          <button
+            onClick={onManageAlts}
+            className="flex items-center gap-1 text-xs text-amber-500 hover:text-amber-600"
+          >
+            <Link2 size={12} />
+            부캐 추가
+          </button>
+        )}
       </div>
     )
   }
@@ -36,13 +39,15 @@ export default function AltCharacterPanel({ alts, linkedAltNames, currentGuildNa
         <p className="text-xs text-gray-400 italic">
           로딩 중… ({linkedAltNames.join(', ')})
         </p>
-        <button
-          onClick={onManageAlts}
-          className="flex items-center gap-1 text-xs text-gray-400 hover:text-amber-500"
-        >
-          <Link2 size={12} />
-          수정
-        </button>
+        {canEdit && (
+          <button
+            onClick={onManageAlts}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-amber-500"
+          >
+            <Link2 size={12} />
+            수정
+          </button>
+        )}
       </div>
     )
   }
@@ -66,13 +71,15 @@ export default function AltCharacterPanel({ alts, linkedAltNames, currentGuildNa
           )}
           {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         </button>
-        <button
-          onClick={onManageAlts}
-          className="flex items-center gap-1 text-xs text-gray-400 hover:text-amber-500"
-        >
-          <Link2 size={12} />
-          수정
-        </button>
+        {canEdit && (
+          <button
+            onClick={onManageAlts}
+            className="flex items-center gap-1 text-xs text-gray-400 hover:text-amber-500"
+          >
+            <Link2 size={12} />
+            수정
+          </button>
+        )}
       </div>
 
       {open && (
