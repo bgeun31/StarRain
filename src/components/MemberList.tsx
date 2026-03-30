@@ -132,6 +132,26 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
     setDiff(memberDiff)
     setFromCache(false)
 
+    if (!memberDiff.isFirstLoad && (memberDiff.added.length > 0 || memberDiff.removed.length > 0)) {
+      writeAuditLogSilently({
+        action: 'guild.member.change',
+        message: `길드원 변경: ${worldName}/${guildName} (추가 ${memberDiff.added.length}, 제외 ${memberDiff.removed.length})`,
+        targetType: 'guild',
+        targetId: `${worldName}:${guildName}`,
+        actor: {
+          uid: profile?.uid,
+          email: profile?.email,
+          name: profile?.displayName,
+        },
+        meta: {
+          guildName,
+          worldName,
+          added: memberDiff.added.slice(0, 300),
+          removed: memberDiff.removed.slice(0, 300),
+        },
+      })
+    }
+
     const addedSet = new Set(memberDiff.added)
     const total    = currentNames.length
     const [linkMaps, nobleMap, nobleCountMap] = await Promise.all([

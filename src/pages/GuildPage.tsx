@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Shield, Bookmark, Users, LogOut, ClipboardList, RefreshCw } from 'lucide-react'
+import { Shield, Bookmark, Users, LogOut, ClipboardList, RefreshCw, FileText } from 'lucide-react'
 
 import GuildSearchBar from '../components/GuildSearchBar'
 import GuildSelector from '../components/GuildSelector'
@@ -16,11 +16,12 @@ interface ActiveGuild {
 }
 
 interface Props {
+  onNavigateMemberChanges: () => void
   onNavigateUsers: () => void
   onNavigateAudit: () => void
 }
 
-export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
+export default function GuildPage({ onNavigateMemberChanges, onNavigateUsers, onNavigateAudit }: Props) {
   const { profile, isAdmin, canEdit, signOut } = useAuth()
   const [savedGuilds, setSavedGuilds]         = useState<SavedGuild[]>([])
   const [activeGuild, setActiveGuild]         = useState<ActiveGuild | null>(null)
@@ -200,6 +201,13 @@ export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
           <div className="flex items-center gap-2 shrink-0">
             {isAdmin && (
               <>
+                <button
+                  onClick={onNavigateMemberChanges}
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  <FileText size={14} />
+                  길드원 변경 내용
+                </button>
                 <button
                   onClick={onNavigateUsers}
                   className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
