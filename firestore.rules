@@ -60,5 +60,12 @@ service cloud.firestore {
       allow read: if isViewer();
       allow write: if isEditor();
     }
+
+    // 수정 기록: 편집자 이상 기록 가능, 관리자만 조회 가능
+    match /auditLogs/{document} {
+      allow create: if isEditor();
+      allow read: if isAdmin();
+      allow update, delete: if false;
+    }
   }
 }

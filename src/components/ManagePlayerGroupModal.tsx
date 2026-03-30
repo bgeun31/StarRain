@@ -3,6 +3,8 @@ import { Plus, X } from 'lucide-react'
 import Modal from './ui/Modal'
 import Button from './ui/Button'
 import { setAltNames, deleteAltLink } from '../services/altLinkService'
+import { writeAuditLogSilently } from '../services/auditLogService'
+import { useAuth } from '../contexts/AuthContext'
 
 interface Props {
   characterName: string
@@ -17,6 +19,7 @@ export default function ManagePlayerGroupModal({
   onClose,
   onSaved,
 }: Props) {
+  const { profile } = useAuth()
   const [altNames, setAltNamesState] = useState<string[]>(
     initialAltNames.length > 0 ? initialAltNames : [''],
   )
@@ -43,8 +46,31 @@ export default function ManagePlayerGroupModal({
     try {
       if (filtered.length === 0) {
         await deleteAltLink(characterName)
+        writeAuditLogSilently({
+          action: 'altLink.delete',
+          message: `부캐 연결 해제: ${characterName}`,
+          targetType: 'member',
+          targetId: characterName,
+          actor: {
+            uid: profile?.uid,
+            email: profile?.email,
+            name: profile?.displayName,
+          },
+        })
       } else {
         await setAltNames(characterName, filtered)
+        writeAuditLogSilently({
+          action: 'altLink.update',
+          message: `부캐 연결 수정: ${characterName} (${filtered.length}명)`,
+          targetType: 'member',
+          targetId: characterName,
+          actor: {
+            uid: profile?.uid,
+            email: profile?.email,
+            name: profile?.displayName,
+          },
+          meta: { altCount: filtered.length, alts: filtered.slice(0, 50) },
+        })
       }
       onSaved()
       onClose()

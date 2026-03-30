@@ -1,0 +1,32 @@
+mutation createMood($name: String!, $description: String, $color: String) @auth(level: USER) {
+  mood_insert(data: {name: $name, description: $description, color: $color})
+}
+
+mutation createJournalEntry($entryDate: Date!, $content: String!) @auth(level: USER) {
+  journalEntry_insert(data: {entryDate: $entryDate, content: $content, createdAt_expr: "request.time", updatedAt_expr: "request.time", userId_expr: "auth.uid"})
+}
+
+query getUserJournalEntries @auth(level: USER) {
+  journalEntries(where: {userId: {eq_expr: "auth.uid"}}) {
+    id
+    entryDate
+    content
+    createdAt
+    updatedAt
+    moods_via_EntryMood {
+      id
+      name
+      description
+      color
+    }
+  }
+}
+
+query getAvailableMoods @auth(level: USER) {
+  moods {
+    id
+    name
+    description
+    color
+  }
+}

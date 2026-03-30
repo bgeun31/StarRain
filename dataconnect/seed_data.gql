@@ -1,0 +1,68 @@
+mutation CreateDemoData @transaction @auth(level: USER, insecureReason: "This is a seed data mutation, so it is safe to expose to all logged in users.") {
+  user_insertMany(data: [
+    {
+      id: "b2d2c18d-2a81-4f1b-9e01-2e6b7d5a9c00",
+      displayName: "Alice Smith",
+      email: "alice@example.com",
+      photoUrl: "https://example.com/alice.jpg",
+      createdAt: "2023-01-01T10:00:00Z"
+    },
+    {
+      id: "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+      displayName: "Bob Johnson",
+      email: "bob@example.com",
+      photoUrl: "https://example.com/bob.jpg",
+      createdAt: "2023-01-02T11:00:00Z"
+    }
+  ])
+  mood_insertMany(data: [
+    {
+      id: "f3e1d0c9-8b7a-6543-210f-edcba9876543",
+      name: "Happy",
+      description: "Feeling joyful and content.",
+      color: "#FFD700"
+    },
+    {
+      id: "cba98765-4321-fede-ba98-76543210fedc",
+      name: "Sad",
+      description: "Feeling down and melancholic.",
+      color: "#87CEEB"
+    },
+    {
+      id: "12345678-90ab-cdef-1234-567890abcdef",
+      name: "Neutral",
+      description: "Feeling neither positive nor negative.",
+      color: "#D3D3D3"
+    }
+  ])
+  journalEntry_insertMany(data: [
+    {
+      id: "1a2b3c4d-5e6f-7890-1234-567890abcdef",
+      userId: "b2d2c18d-2a81-4f1b-9e01-2e6b7d5a9c00",
+      entryDate: "2023-10-26",
+      content: "Had a great day at work! Feeling productive.",
+      createdAt: "2023-10-26T14:30:00Z",
+      updatedAt: "2023-10-26T14:30:00Z"
+    },
+    {
+      id: "5e6f7a8b-9c0d-1234-5678-90abcdef1234",
+      userId: "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+      entryDate: "2023-10-25",
+      content: "Feeling a bit tired today, but managed to finish my tasks.",
+      createdAt: "2023-10-25T09:00:00Z",
+      updatedAt: "2023-10-25T09:00:00Z"
+    }
+  ])
+  entryMood_insertMany(data: [
+    {
+      journalEntryId: "1a2b3c4d-5e6f-7890-1234-567890abcdef",
+      moodId: "f3e1d0c9-8b7a-6543-210f-edcba9876543",
+      createdAt: "2023-10-26T14:30:00Z"
+    },
+    {
+      journalEntryId: "5e6f7a8b-9c0d-1234-5678-90abcdef1234",
+      moodId: "cba98765-4321-fede-ba98-76543210fedc",
+      createdAt: "2023-10-25T09:00:00Z"
+    }
+  ])
+}

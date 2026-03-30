@@ -22,6 +22,19 @@ export interface SavedGuild {
   createdAt: Timestamp
 }
 
+export interface AuditLogEntry {
+  id: string
+  actorUid: string
+  actorEmail: string
+  actorName: string
+  action: string
+  message: string
+  targetType?: string
+  targetId?: string
+  meta?: Record<string, unknown>
+  createdAt: Timestamp
+}
+
 // ─── 넥슨 Open API 응답 타입 ──────────────────────────────────────────────────
 
 export interface NexonGuildBasic {

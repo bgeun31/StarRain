@@ -4,6 +4,7 @@ import { AuthProvider, useAuth } from './contexts/AuthContext'
 import LoginPage from './pages/LoginPage'
 import GuildPage from './pages/GuildPage'
 import UserManagePage from './pages/UserManagePage'
+import AuditLogPage from './pages/AuditLogPage'
 import Button from './components/ui/Button'
 
 function BootstrapScreen() {
@@ -59,7 +60,7 @@ function BootstrapScreen() {
 
 function AppRoutes() {
   const { user, profile, loading, bootstrapping } = useAuth()
-  const [page, setPage] = useState<'guild' | 'users'>('guild')
+  const [page, setPage] = useState<'guild' | 'users' | 'audit'>('guild')
 
   if (loading) {
     return (
@@ -78,7 +79,11 @@ function AppRoutes() {
     return <UserManagePage onBack={() => setPage('guild')} />
   }
 
-  return <GuildPage onNavigateUsers={() => setPage('users')} />
+  if (page === 'audit') {
+    return <AuditLogPage onBack={() => setPage('guild')} />
+  }
+
+  return <GuildPage onNavigateUsers={() => setPage('users')} onNavigateAudit={() => setPage('audit')} />
 }
 
 export default function App() {

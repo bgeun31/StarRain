@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ArrowLeft, UserPlus, Trash2, KeyRound } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchAllUsers, createUser, updateUserRole, deleteUser } from '../services/userService'
+import { writeAuditLogSilently } from '../services/auditLogService'
 import Button from '../components/ui/Button'
 import Modal from '../components/ui/Modal'
 import type { UserProfile, UserRole } from '../types'
@@ -41,6 +42,23 @@ export default function UserManagePage({ onBack }: Props) {
       return
     }
     await updateUserRole(uid, role)
+    const targetUser = users.find((u) => u.uid === uid)
+    writeAuditLogSilently({
+      action: 'user.role.update',
+      message: `사용자 권한 변경: ${targetUser?.displayName || targetUser?.email || uid} -> ${role}`,
+      targetType: 'user',
+      targetId: uid,
+      actor: {
+        uid: myProfile?.uid,
+        email: myProfile?.email,
+        name: myProfile?.displayName,
+      },
+      meta: {
+        role,
+        targetEmail: targetUser?.email ?? '',
+        targetName: targetUser?.displayName ?? '',
+      },
+    })
     await load()
   }
 
@@ -51,6 +69,21 @@ export default function UserManagePage({ onBack }: Props) {
     }
     if (!confirm(`"${u.displayName || u.email}" 계정을 삭제하시겠습니까?\n해당 사용자는 더 이상 로그인할 수 없습니다.`)) return
     await deleteUser(u.uid)
+    writeAuditLogSilently({
+      action: 'user.delete',
+      message: `사용자 삭제: ${u.displayName || u.email}`,
+      targetType: 'user',
+      targetId: u.uid,
+      actor: {
+        uid: myProfile?.uid,
+        email: myProfile?.email,
+        name: myProfile?.displayName,
+      },
+      meta: {
+        targetEmail: u.email,
+        targetName: u.displayName,
+      },
+    })
     await load()
   }
 
@@ -146,6 +179,7 @@ export default function UserManagePage({ onBack }: Props) {
 }
 
 function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const { profile } = useAuth()
   const [email, setEmail]           = useState('')
   const [password, setPassword]     = useState('')
   const [displayName, setDisplayName] = useState('')
@@ -163,6 +197,22 @@ function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
     setError('')
     try {
       await createUser(email, password, displayName, role)
+      writeAuditLogSilently({
+        action: 'user.create',
+        message: `사용자 추가: ${displayName || email} (${role})`,
+        targetType: 'user',
+        targetId: email,
+        actor: {
+          uid: profile?.uid,
+          email: profile?.email,
+          name: profile?.displayName,
+        },
+        meta: {
+          role,
+          targetEmail: email,
+          targetName: displayName,
+        },
+      })
       onSaved()
       onClose()
     } catch (err) {
@@ -236,7 +286,7 @@ function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
 }
 
 function ChangeMyPasswordModal({ onClose }: { onClose: () => void }) {
-  const { changePassword } = useAuth()
+  const { changePassword, profile } = useAuth()
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword]         = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -263,6 +313,17 @@ function ChangeMyPasswordModal({ onClose }: { onClose: () => void }) {
     setError('')
     try {
       await changePassword(currentPassword, newPassword)
+      writeAuditLogSilently({
+        action: 'user.password.change',
+        message: '본인 계정 비밀번호 변경',
+        targetType: 'user',
+        targetId: profile?.uid ?? '',
+        actor: {
+          uid: profile?.uid,
+          email: profile?.email,
+          name: profile?.displayName,
+        },
+      })
       alert('비밀번호가 변경되었습니다.')
       onClose()
     } catch (err) {

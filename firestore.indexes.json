@@ -1,20 +1,4 @@
 {
-  "indexes": [
-    {
-      "collectionGroup": "savedGuilds",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "savedGuilds",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "guildName", "order": "ASCENDING" },
-        { "fieldPath": "worldName", "order": "ASCENDING" }
-      ]
-    }
-  ],
+  "indexes": [],
   "fieldOverrides": []
 }

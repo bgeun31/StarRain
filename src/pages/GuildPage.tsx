@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
-import { Shield, Bookmark, Users, LogOut } from 'lucide-react'
+import { Shield, Bookmark, Users, LogOut, ClipboardList } from 'lucide-react'
 
 import GuildSearchBar from '../components/GuildSearchBar'
 import GuildSelector from '../components/GuildSelector'
 import MemberList from '../components/MemberList'
 import { fetchSavedGuilds, saveGuild, removeSavedGuild } from '../services/savedGuildService'
+import { writeAuditLogSilently } from '../services/auditLogService'
 import { useAuth } from '../contexts/AuthContext'
 import type { SavedGuild } from '../types'
 
@@ -15,9 +16,10 @@ interface ActiveGuild {
 
 interface Props {
   onNavigateUsers: () => void
+  onNavigateAudit: () => void
 }
 
-export default function GuildPage({ onNavigateUsers }: Props) {
+export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
   const { profile, isAdmin, canEdit, signOut } = useAuth()
   const [savedGuilds, setSavedGuilds]         = useState<SavedGuild[]>([])
   const [activeGuild, setActiveGuild]         = useState<ActiveGuild | null>(null)
@@ -44,6 +46,18 @@ export default function GuildPage({ onNavigateUsers }: Props) {
   async function handleSave(guildName: string, worldName: string) {
     try {
       await saveGuild(guildName, worldName)
+      writeAuditLogSilently({
+        action: 'savedGuild.create',
+        message: `즐겨찾기 추가: ${worldName}/${guildName}`,
+        targetType: 'savedGuild',
+        targetId: `${worldName}:${guildName}`,
+        actor: {
+          uid: profile?.uid,
+          email: profile?.email,
+          name: profile?.displayName,
+        },
+        meta: { guildName, worldName },
+      })
       await loadSaved()
     } catch (err) {
       console.error(err)
@@ -54,6 +68,18 @@ export default function GuildPage({ onNavigateUsers }: Props) {
     if (!confirm(`"${guild.guildName}" 을(를) 즐겨찾기에서 삭제하시겠습니까?`)) return
     try {
       await removeSavedGuild(guild.id)
+      writeAuditLogSilently({
+        action: 'savedGuild.delete',
+        message: `즐겨찾기 삭제: ${guild.worldName}/${guild.guildName}`,
+        targetType: 'savedGuild',
+        targetId: guild.id,
+        actor: {
+          uid: profile?.uid,
+          email: profile?.email,
+          name: profile?.displayName,
+        },
+        meta: { guildName: guild.guildName, worldName: guild.worldName },
+      })
       await loadSaved()
       if (selectedSavedId === guild.id) {
         setSelectedSavedId(null)
@@ -95,13 +121,22 @@ export default function GuildPage({ onNavigateUsers }: Props) {
           {/* 우: 사용자 관리 + 로그아웃 */}
           <div className="flex items-center gap-2 shrink-0">
             {isAdmin && (
-              <button
-                onClick={onNavigateUsers}
-                className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
-              >
-                <Users size={14} />
-                사용자 관리
-              </button>
+              <>
+                <button
+                  onClick={onNavigateUsers}
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  <Users size={14} />
+                  사용자 관리
+                </button>
+                <button
+                  onClick={onNavigateAudit}
+                  className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 transition-colors"
+                >
+                  <ClipboardList size={14} />
+                  수정 내용
+                </button>
+              </>
             )}
             <div className="flex items-center gap-2 pl-2 border-l border-gray-200">
               <span className="text-xs text-gray-500 hidden sm:block">

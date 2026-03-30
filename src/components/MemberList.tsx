@@ -9,6 +9,8 @@ import { fetchGuildId, fetchGuildBasic } from '../services/mapleApiService'
 import { getOrFetchCharacter } from '../services/characterCacheService'
 import { getAltNamesMap } from '../services/altLinkService'
 import { getNobleMap, setNoble, setNobleBulk } from '../services/memberDataService'
+import { writeAuditLogSilently } from '../services/auditLogService'
+import { useAuth } from '../contexts/AuthContext'
 import {
   getCachedMemberList,
   setCachedMemberList,
@@ -32,6 +34,7 @@ function formatAge(ms: number): string {
 }
 
 export default function MemberList({ guildName, worldName, canEdit }: Props) {
+  const { profile } = useAuth()
   const [guildInfo, setGuildInfo]       = useState<NexonGuildBasic | null>(null)
   const [members, setMembers]           = useState<MemberView[]>([])
   const [syncing, setSyncing]           = useState(false)
@@ -227,6 +230,18 @@ export default function MemberList({ guildName, worldName, canEdit }: Props) {
       prev.map((m) => m.characterName === characterName ? { ...m, noble: next } : m),
     )
     await setNoble(characterName, next)
+    writeAuditLogSilently({
+      action: 'member.noble.update',
+      message: `노블 변경: ${characterName} -> ${next ? 'O' : 'X'}`,
+      targetType: 'member',
+      targetId: characterName,
+      actor: {
+        uid: profile?.uid,
+        email: profile?.email,
+        name: profile?.displayName,
+      },
+      meta: { guildName, worldName, noble: next },
+    })
   }
 
   async function handleBulkNobleUpdate(characterNames: string[], noble: boolean) {
@@ -249,6 +264,26 @@ export default function MemberList({ guildName, worldName, canEdit }: Props) {
     setMembers((prev) =>
       prev.map((m) => matchedSet.has(m.characterName) ? { ...m, noble } : m),
     )
+
+    writeAuditLogSilently({
+      action: 'member.noble.bulkUpdate',
+      message: `노블 일괄 변경: ${matched.length}명 -> ${noble ? 'O' : 'X'}`,
+      targetType: 'member',
+      targetId: `${worldName}:${guildName}`,
+      actor: {
+        uid: profile?.uid,
+        email: profile?.email,
+        name: profile?.displayName,
+      },
+      meta: {
+        guildName,
+        worldName,
+        noble,
+        updatedCount: matched.length,
+        notFoundCount: notFound.length,
+        targets: matched.slice(0, 200),
+      },
+    })
 
     return { updatedCount: matched.length, notFound }
   }
