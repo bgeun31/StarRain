@@ -1,8 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import {
+  EmailAuthProvider,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
+  updatePassword,
   type User,
 } from 'firebase/auth'
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore'
@@ -20,6 +23,7 @@ interface AuthContextValue {
   isAdmin: boolean
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>
   setupAdmin: () => Promise<void>  // 부트스트랩: 본인을 관리자로 설정
 }
 
@@ -64,6 +68,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setBootstrapping(false)
   }
 
+  async function changePassword(currentPassword: string, newPassword: string) {
+    const currentUser = auth.currentUser
+    if (!currentUser || !currentUser.email) {
+      throw new Error('로그인된 사용자 정보를 확인할 수 없습니다.')
+    }
+
+    const credential = EmailAuthProvider.credential(currentUser.email, currentPassword)
+    await reauthenticateWithCredential(currentUser, credential)
+    await updatePassword(currentUser, newPassword)
+  }
+
   /** 현재 로그인된 사용자를 관리자로 초기 설정 */
   async function setupAdmin() {
     if (!user) return
@@ -86,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider value={{
       user, profile, role, loading, bootstrapping,
       canEdit, isAdmin,
-      signIn, signOut, setupAdmin,
+      signIn, signOut, changePassword, setupAdmin,
     }}>
       {children}
     </AuthContext.Provider>

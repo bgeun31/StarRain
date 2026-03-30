@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ArrowLeft, UserPlus, Trash2, ShieldCheck } from 'lucide-react'
+import { ArrowLeft, UserPlus, Trash2, KeyRound } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import { fetchAllUsers, createUser, updateUserRole, deleteUser } from '../services/userService'
 import Button from '../components/ui/Button'
@@ -18,9 +18,10 @@ interface Props {
 
 export default function UserManagePage({ onBack }: Props) {
   const { profile: myProfile } = useAuth()
-  const [users, setUsers]       = useState<UserProfile[]>([])
-  const [loading, setLoading]   = useState(true)
-  const [showAdd, setShowAdd]   = useState(false)
+  const [users, setUsers]                = useState<UserProfile[]>([])
+  const [loading, setLoading]            = useState(true)
+  const [showAdd, setShowAdd]            = useState(false)
+  const [showChangePassword, setShowChangePassword] = useState(false)
 
   async function load() {
     setLoading(true)
@@ -62,8 +63,6 @@ export default function UserManagePage({ onBack }: Props) {
             돌아가기
           </button>
           <div className="flex-1" />
-          <ShieldCheck className="text-amber-500" size={20} />
-          <h1 className="text-lg font-bold text-gray-900">사용자 관리</h1>
           <Button size="sm" onClick={() => setShowAdd(true)}>
             <UserPlus size={14} />
             사용자 추가
@@ -81,7 +80,7 @@ export default function UserManagePage({ onBack }: Props) {
                 <tr className="border-b border-gray-100 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-400">
                   <th className="px-5 py-3">이름 / 이메일</th>
                   <th className="px-5 py-3">권한</th>
-                  <th className="px-5 py-3 w-16"></th>
+                  <th className="px-5 py-3 w-48 text-right">관리</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -104,14 +103,22 @@ export default function UserManagePage({ onBack }: Props) {
                       </select>
                     </td>
                     <td className="px-5 py-4 text-right">
-                      {u.uid !== myProfile?.uid && (
-                        <button
-                          onClick={() => handleDelete(u)}
-                          className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      )}
+                      <div className="flex items-center justify-end gap-2">
+                        {u.uid === myProfile?.uid ? (
+                          <Button size="sm" variant="secondary" onClick={() => setShowChangePassword(true)}>
+                            <KeyRound size={14} />
+                            비밀번호 변경
+                          </Button>
+                        ) : (
+                          <button
+                            onClick={() => handleDelete(u)}
+                            className="p-1.5 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded transition-colors"
+                            title="사용자 삭제"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -130,6 +137,9 @@ export default function UserManagePage({ onBack }: Props) {
 
       {showAdd && (
         <AddUserModal onClose={() => setShowAdd(false)} onSaved={load} />
+      )}
+      {showChangePassword && (
+        <ChangeMyPasswordModal onClose={() => setShowChangePassword(false)} />
       )}
     </div>
   )
@@ -218,6 +228,101 @@ function AddUserModal({ onClose, onSaved }: { onClose: () => void; onSaved: () =
           <Button type="button" variant="secondary" onClick={onClose}>취소</Button>
           <Button type="submit" disabled={loading}>
             {loading ? '생성 중...' : '사용자 추가'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function ChangeMyPasswordModal({ onClose }: { onClose: () => void }) {
+  const { changePassword } = useAuth()
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword]         = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [loading, setLoading]                 = useState(false)
+  const [error, setError]                     = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+
+    if (newPassword.length < 6) {
+      setError('새 비밀번호는 6자 이상이어야 합니다.')
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      setError('새 비밀번호 확인이 일치하지 않습니다.')
+      return
+    }
+    if (currentPassword === newPassword) {
+      setError('새 비밀번호는 현재 비밀번호와 달라야 합니다.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    try {
+      await changePassword(currentPassword, newPassword)
+      alert('비밀번호가 변경되었습니다.')
+      onClose()
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '오류가 발생했습니다.'
+      if (msg.includes('wrong-password') || msg.includes('invalid-credential')) {
+        setError('현재 비밀번호가 올바르지 않습니다.')
+      } else if (msg.includes('too-many-requests')) {
+        setError('요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.')
+      } else {
+        setError(msg)
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal title="비밀번호 변경" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">현재 비밀번호</label>
+          <input
+            type="password"
+            value={currentPassword}
+            onChange={(e) => setCurrentPassword(e.target.value)}
+            required
+            autoComplete="current-password"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">새 비밀번호</label>
+          <input
+            type="password"
+            value={newPassword}
+            onChange={(e) => setNewPassword(e.target.value)}
+            required
+            autoComplete="new-password"
+            placeholder="6자 이상"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">새 비밀번호 확인</label>
+          <input
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            required
+            autoComplete="new-password"
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+        </div>
+
+        {error && <p className="text-sm text-red-500">{error}</p>}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>취소</Button>
+          <Button type="submit" disabled={loading}>
+            {loading ? '변경 중...' : '비밀번호 변경'}
           </Button>
         </div>
       </form>
