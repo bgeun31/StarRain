@@ -396,6 +396,33 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
     return { updatedCount: matched.length, notFound }
   }
 
+  async function handleResetAllNobleCount() {
+    const names = members.map((m) => m.characterName)
+    if (names.length === 0) {
+      throw new Error('초기화할 길드원이 없습니다.')
+    }
+
+    await setNobleCountBulk(names, 0)
+    setMembers((prev) => prev.map((m) => ({ ...m, nobleCount: 0 })))
+
+    writeAuditLogSilently({
+      action: 'member.nobleCount.resetAll',
+      message: `누적 횟수 전체 초기화: ${names.length}명`,
+      targetType: 'member',
+      targetId: `${worldName}:${guildName}`,
+      actor: {
+        uid: profile?.uid,
+        email: profile?.email,
+        name: profile?.displayName,
+      },
+      meta: {
+        guildName,
+        worldName,
+        resetCount: names.length,
+      },
+    })
+  }
+
   return (
     <div>
       {/* 헤더 */}
@@ -554,12 +581,14 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
       {showBulkNobleEdit && (
         <BulkNobleEditModal
           onClose={() => setShowBulkNobleEdit(false)}
+          availableCharacterNames={members.map((m) => m.characterName)}
           onApply={handleBulkNobleUpdate}
         />
       )}
       {showBulkNobleCountEdit && (
         <BulkNobleCountEditModal
           onClose={() => setShowBulkNobleCountEdit(false)}
+          onResetAll={handleResetAllNobleCount}
           onApply={handleBulkNobleCountUpdate}
         />
       )}
@@ -569,23 +598,28 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
 
 function BulkNobleEditModal({
   onClose,
+  availableCharacterNames,
   onApply,
 }: {
   onClose: () => void
+  availableCharacterNames: string[]
   onApply: (characterNames: string[], noble: boolean) => Promise<{ updatedCount: number; notFound: string[] }>
 }) {
   const [rawNames, setRawNames] = useState('')
   const [target, setTarget]     = useState<'O' | 'X'>('O')
+  const [applyAll, setApplyAll] = useState(false)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const names = Array.from(
-      new Set(rawNames.split(/[\n,]/).map((name) => name.trim()).filter(Boolean)),
-    )
+    const names = applyAll
+      ? availableCharacterNames
+      : Array.from(
+        new Set(rawNames.split(/[\n,]/).map((name) => name.trim()).filter(Boolean)),
+      )
     if (names.length === 0) {
-      setError('캐릭터명을 1개 이상 입력해 주세요.')
+      setError(applyAll ? '적용할 길드원이 없습니다.' : '캐릭터명을 1개 이상 입력해 주세요.')
       return
     }
 
@@ -617,10 +651,21 @@ function BulkNobleEditModal({
             onChange={(e) => setRawNames(e.target.value)}
             placeholder={'캐릭터명1\n캐릭터명2, 캐릭터명3'}
             rows={6}
+            disabled={applyAll}
             className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-amber-400"
           />
           <p className="mt-1 text-xs text-gray-400">줄바꿈 또는 콤마(,)로 여러 명을 입력할 수 있습니다.</p>
         </div>
+
+        <label className="flex items-center gap-2 text-sm text-gray-700">
+          <input
+            type="checkbox"
+            checked={applyAll}
+            onChange={(e) => setApplyAll(e.target.checked)}
+            className="h-4 w-4 rounded border-gray-300 text-amber-500 focus:ring-amber-400"
+          />
+          전체 선택 (현재 길드원 전체 {availableCharacterNames.length}명 적용)
+        </label>
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">반영 값</label>
@@ -665,9 +710,11 @@ function BulkNobleEditModal({
 
 function BulkNobleCountEditModal({
   onClose,
+  onResetAll,
   onApply,
 }: {
   onClose: () => void
+  onResetAll: () => Promise<void>
   onApply: (characterNames: string[], count: number) => Promise<{ updatedCount: number; notFound: string[] }>
 }) {
   const [rawNames, setRawNames] = useState('')
@@ -698,6 +745,21 @@ function BulkNobleCountEditModal({
       onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : '일괄 수정 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleResetAll() {
+    if (!confirm('누적 횟수를 전체 0회로 초기화하시겠습니까?')) return
+    setLoading(true)
+    setError('')
+    try {
+      await onResetAll()
+      alert('누적 횟수를 전체 초기화했습니다.')
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '초기화 중 오류가 발생했습니다.')
     } finally {
       setLoading(false)
     }
@@ -741,6 +803,9 @@ function BulkNobleCountEditModal({
         {error && <p className="text-sm text-red-500">{error}</p>}
 
         <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="danger" onClick={handleResetAll} disabled={loading}>
+            모두 초기화
+          </Button>
           <Button type="button" variant="secondary" onClick={onClose}>취소</Button>
           <Button type="submit" disabled={loading}>
             {loading ? '반영 중...' : '일괄 반영'}
