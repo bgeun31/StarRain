@@ -10,17 +10,6 @@ export interface SavedGuild {
   createdAt: Timestamp
 }
 
-/**
- * 플레이어 그룹 (Firebase 저장)
- * 같은 유저의 캐릭터명들을 묶어두는 용도
- */
-export interface PlayerGroup {
-  id: string
-  characterNames: string[]  // 본캐 + 부캐 모두 포함
-  memo?: string             // 관리자 메모 (선택)
-  createdAt: Timestamp
-}
-
 // ─── 넥슨 Open API 응답 타입 ──────────────────────────────────────────────────
 
 export interface NexonGuildBasic {
@@ -57,9 +46,9 @@ export interface MemberView {
   characterClass: string
   characterLevel: number
   guildName: string
-  playerGroupId: string | null  // Firebase playerGroup 연결 여부
-  isNew: boolean                // 이번 로드에서 새로 감지된 신규 가입자
-  alts: AltView[]
+  linkedAltNames: string[]  // DB에 저장된 부캐 이름 목록 (비어있으면 미연결)
+  isNew: boolean            // 이번 로드에서 새로 감지된 신규 가입자
+  alts: AltView[]           // Nexon API 조회된 부캐 상세 정보
 }
 
 export interface AltView {

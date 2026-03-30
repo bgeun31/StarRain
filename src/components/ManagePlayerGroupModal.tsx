@@ -2,57 +2,49 @@ import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import Modal from './ui/Modal'
 import Button from './ui/Button'
-import { createPlayerGroup, updatePlayerGroup } from '../services/playerGroupService'
-import type { PlayerGroup } from '../types'
+import { setAltNames, deleteAltLink } from '../services/altLinkService'
 
 interface Props {
-  /** 수정 시 기존 그룹, 신규 시 undefined */
-  existing?: PlayerGroup
-  /** 길드원 목록에서 바로 시작할 때 초기 캐릭터명 */
-  initialCharacterName?: string
+  characterName: string
+  initialAltNames: string[]
   onClose: () => void
   onSaved: () => void
 }
 
 export default function ManagePlayerGroupModal({
-  existing,
-  initialCharacterName,
+  characterName,
+  initialAltNames,
   onClose,
   onSaved,
 }: Props) {
-  const [names, setNames] = useState<string[]>(
-    existing?.characterNames ?? (initialCharacterName ? [initialCharacterName] : ['']),
+  const [altNames, setAltNamesState] = useState<string[]>(
+    initialAltNames.length > 0 ? initialAltNames : [''],
   )
-  const [memo, setMemo] = useState(existing?.memo ?? '')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
   function addRow() {
-    setNames((prev) => [...prev, ''])
+    setAltNamesState((prev) => [...prev, ''])
   }
 
   function removeRow(i: number) {
-    setNames((prev) => prev.filter((_, idx) => idx !== i))
+    setAltNamesState((prev) => prev.filter((_, idx) => idx !== i))
   }
 
   function updateRow(i: number, val: string) {
-    setNames((prev) => prev.map((v, idx) => (idx === i ? val : v)))
+    setAltNamesState((prev) => prev.map((v, idx) => (idx === i ? val : v)))
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    const filtered = names.map((n) => n.trim()).filter(Boolean)
-    if (filtered.length < 2) {
-      setError('캐릭터는 2개 이상 입력해야 합니다.')
-      return
-    }
+    const filtered = altNames.map((n) => n.trim()).filter(Boolean)
     setLoading(true)
     setError('')
     try {
-      if (existing) {
-        await updatePlayerGroup(existing.id, filtered, memo)
+      if (filtered.length === 0) {
+        await deleteAltLink(characterName)
       } else {
-        await createPlayerGroup(filtered, memo)
+        await setAltNames(characterName, filtered)
       }
       onSaved()
       onClose()
@@ -65,31 +57,29 @@ export default function ManagePlayerGroupModal({
   }
 
   return (
-    <Modal title={existing ? '플레이어 그룹 수정' : '플레이어 그룹 추가'} onClose={onClose}>
+    <Modal title={`부캐릭터 관리 — ${characterName}`} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="text-xs text-gray-500">
-          같은 유저의 캐릭터명을 모두 입력하세요. 부캐 정보 표시에 사용됩니다.
+          {characterName}의 부캐릭터 이름을 입력하세요. 비워두고 저장하면 연결이 해제됩니다.
         </p>
 
         <div className="space-y-2">
-          {names.map((name, i) => (
+          {altNames.map((name, i) => (
             <div key={i} className="flex items-center gap-2">
               <input
                 type="text"
                 value={name}
                 onChange={(e) => updateRow(i, e.target.value)}
-                placeholder={`캐릭터명 ${i + 1}`}
+                placeholder={`부캐릭터명 ${i + 1}`}
                 className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
-              {names.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeRow(i)}
-                  className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                >
-                  <X size={15} />
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => removeRow(i)}
+                className="rounded p-1 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+              >
+                <X size={15} />
+              </button>
             </div>
           ))}
         </div>
@@ -100,19 +90,8 @@ export default function ManagePlayerGroupModal({
           className="flex items-center gap-1 text-sm text-amber-600 hover:text-amber-700"
         >
           <Plus size={14} />
-          캐릭터 추가
+          부캐 추가
         </button>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">메모 (선택)</label>
-          <input
-            type="text"
-            value={memo}
-            onChange={(e) => setMemo(e.target.value)}
-            placeholder="관리자 메모"
-            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
-          />
-        </div>
 
         {error && <p className="text-sm text-red-500">{error}</p>}
 

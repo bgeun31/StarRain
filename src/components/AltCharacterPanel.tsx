@@ -5,29 +5,49 @@ import type { AltView } from '../types'
 
 interface Props {
   alts: AltView[]
+  linkedAltNames: string[]
   currentGuildName: string
-  onManageGroup: () => void
+  onManageAlts: () => void
 }
 
-export default function AltCharacterPanel({ alts, currentGuildName, onManageGroup }: Props) {
+export default function AltCharacterPanel({ alts, linkedAltNames, currentGuildName, onManageAlts }: Props) {
   const [open, setOpen] = useState(false)
 
-  if (alts.length === 0) {
+  // 부캐 미등록
+  if (linkedAltNames.length === 0) {
     return (
       <div className="mt-3 border-t border-gray-100 pt-3 flex items-center justify-between">
-        <p className="text-xs text-gray-400 italic">등록된 부캐릭터 없음</p>
+        <p className="text-xs text-gray-400 italic">부캐릭터 없음</p>
         <button
-          onClick={onManageGroup}
+          onClick={onManageAlts}
           className="flex items-center gap-1 text-xs text-amber-500 hover:text-amber-600"
         >
           <Link2 size={12} />
-          부캐 연결
+          부캐 추가
         </button>
       </div>
     )
   }
 
-  const sameGuild = alts.filter((a) => a.guildName === currentGuildName)
+  // 부캐 등록됐지만 Nexon API 조회 대기 중
+  if (alts.length === 0) {
+    return (
+      <div className="mt-3 border-t border-gray-100 pt-3 flex items-center justify-between">
+        <p className="text-xs text-gray-400 italic">
+          로딩 중… ({linkedAltNames.join(', ')})
+        </p>
+        <button
+          onClick={onManageAlts}
+          className="flex items-center gap-1 text-xs text-gray-400 hover:text-amber-500"
+        >
+          <Link2 size={12} />
+          수정
+        </button>
+      </div>
+    )
+  }
+
+  const sameGuild  = alts.filter((a) => a.guildName === currentGuildName)
   const otherGuild = alts.filter((a) => a.guildName !== currentGuildName)
 
   return (
@@ -47,7 +67,7 @@ export default function AltCharacterPanel({ alts, currentGuildName, onManageGrou
           {open ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
         </button>
         <button
-          onClick={onManageGroup}
+          onClick={onManageAlts}
           className="flex items-center gap-1 text-xs text-gray-400 hover:text-amber-500"
         >
           <Link2 size={12} />

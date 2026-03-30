@@ -1,11 +1,12 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { RefreshCw, AlertCircle, UserPlus, UserMinus, Clock } from 'lucide-react'
+import { RefreshCw, AlertCircle, UserPlus, UserMinus, Clock, LayoutGrid, Table2 } from 'lucide-react'
 import MemberCard from './MemberCard'
+import MemberTable from './MemberTable'
 import ManagePlayerGroupModal from './ManagePlayerGroupModal'
 import Button from './ui/Button'
 import { fetchGuildId, fetchGuildBasic } from '../services/mapleApiService'
 import { getOrFetchCharacter } from '../services/characterCacheService'
-import { buildGroupMap } from '../services/playerGroupService'
+import { getAltNamesMap } from '../services/altLinkService'
 import {
   getCachedMemberList,
   setCachedMemberList,
@@ -13,7 +14,7 @@ import {
   type MemberDiff,
   type StoredMember,
 } from '../services/guildMemberCacheService'
-import type { MemberView, NexonGuildBasic, PlayerGroup } from '../types'
+import type { MemberView, NexonGuildBasic } from '../types'
 
 interface Props {
   guildName: string
@@ -28,16 +29,17 @@ function formatAge(ms: number): string {
 }
 
 export default function MemberList({ guildName, worldName }: Props) {
-  const [guildInfo, setGuildInfo]   = useState<NexonGuildBasic | null>(null)
-  const [members, setMembers]       = useState<MemberView[]>([])
-  const [syncing, setSyncing]       = useState(false)   // 새로고침 중
+  const [guildInfo, setGuildInfo]       = useState<NexonGuildBasic | null>(null)
+  const [members, setMembers]           = useState<MemberView[]>([])
+  const [syncing, setSyncing]           = useState(false)
   const [syncProgress, setSyncProgress] = useState({ loaded: 0, total: 0 })
-  const [diff, setDiff]             = useState<MemberDiff | null>(null)
-  const [syncedAt, setSyncedAt]     = useState<number | null>(null)
-  const [fromCache, setFromCache]   = useState(false)
-  const [error, setError]           = useState('')
-  const [search, setSearch]         = useState('')
-  const [groupModal, setGroupModal] = useState<{ characterName: string; existingGroup?: PlayerGroup } | null>(null)
+  const [diff, setDiff]                 = useState<MemberDiff | null>(null)
+  const [syncedAt, setSyncedAt]         = useState<number | null>(null)
+  const [fromCache, setFromCache]       = useState(false)
+  const [error, setError]               = useState('')
+  const [search, setSearch]             = useState('')
+  const [altModal, setAltModal]         = useState<{ characterName: string; altNames: string[] } | null>(null)
+  const [viewMode, setViewMode]         = useState<'card' | 'table'>('card')
 
   const abortRef = useRef<AbortController | null>(null)
 
@@ -49,8 +51,7 @@ export default function MemberList({ guildName, worldName }: Props) {
     setSyncedAt(cache.cachedAt.toMillis())
     setFromCache(true)
 
-    // ── 캐시 데이터로 즉시 렌더링 (API 0회, Firestore 1회) ──────────────
-    const groupMap = await buildGroupMap(cache.memberNames)
+    const altMap = await getAltNamesMap(cache.memberNames)
     if (signal.aborted) return true
 
     const views: MemberView[] = cache.members.map((m) => ({
@@ -58,20 +59,20 @@ export default function MemberList({ guildName, worldName }: Props) {
       characterClass: m.characterClass,
       characterLevel: m.characterLevel,
       guildName: m.guildName ?? guildName,
-      playerGroupId: groupMap.get(m.characterName)?.id ?? null,
+      linkedAltNames: altMap.get(m.characterName) ?? [],
       isNew: false,
-      alts: [],  // 부캐는 아래에서 비동기 로드
+      alts: [],
     }))
     setMembers(views.sort((a, b) => b.characterLevel - a.characterLevel))
 
-    // ── 부캐 정보 백그라운드 로드 ────────────────────────────────────────
+    // 부캐 상세 정보 백그라운드 로드
     for (const view of views) {
       if (signal.aborted) return true
-      const group = groupMap.get(view.characterName)
-      if (!group) continue
+      const altNames = altMap.get(view.characterName)
+      if (!altNames || altNames.length === 0) continue
 
       const alts: MemberView['alts'] = []
-      for (const altName of group.characterNames.filter((n) => n !== view.characterName)) {
+      for (const altName of altNames) {
         if (signal.aborted) return true
         const ai = await getOrFetchCharacter(altName, signal)
         if (ai && ai.character_level > 0) {
@@ -108,7 +109,7 @@ export default function MemberList({ guildName, worldName }: Props) {
 
     const addedSet = new Set(memberDiff.added)
     const total    = currentNames.length
-    const groupMap = await buildGroupMap(currentNames)
+    const altMap   = await getAltNamesMap(currentNames)
     if (signal.aborted) return
 
     setSyncProgress({ loaded: 0, total })
@@ -118,10 +119,10 @@ export default function MemberList({ guildName, worldName }: Props) {
 
     for (let i = 0; i < currentNames.length; i++) {
       if (signal.aborted) return
-      const name  = currentNames[i]
-      const isNew = addedSet.has(name)
-      const info  = await getOrFetchCharacter(name, signal, isNew)
-      const group = groupMap.get(name)
+      const name     = currentNames[i]
+      const isNew    = addedSet.has(name)
+      const info     = await getOrFetchCharacter(name, signal, isNew)
+      const altNames = altMap.get(name) ?? []
 
       storedMembers.push({
         characterName: name,
@@ -131,13 +132,11 @@ export default function MemberList({ guildName, worldName }: Props) {
       })
 
       const alts: MemberView['alts'] = []
-      if (group) {
-        for (const altName of group.characterNames.filter((n) => n !== name)) {
-          if (signal.aborted) return
-          const ai = await getOrFetchCharacter(altName, signal)
-          if (ai && ai.character_level > 0) {
-            alts.push({ characterName: altName, characterClass: ai.character_class, characterLevel: ai.character_level, guildName: ai.character_guild_name ?? '' })
-          }
+      for (const altName of altNames) {
+        if (signal.aborted) return
+        const ai = await getOrFetchCharacter(altName, signal)
+        if (ai && ai.character_level > 0) {
+          alts.push({ characterName: altName, characterClass: ai.character_class, characterLevel: ai.character_level, guildName: ai.character_guild_name ?? '' })
         }
       }
 
@@ -146,7 +145,7 @@ export default function MemberList({ guildName, worldName }: Props) {
         characterClass: info?.character_class ?? '알 수 없음',
         characterLevel: info?.character_level ?? 0,
         guildName: info?.character_guild_name ?? guildName,
-        playerGroupId: group?.id ?? null,
+        linkedAltNames: altNames,
         isNew,
         alts,
       })
@@ -157,8 +156,7 @@ export default function MemberList({ guildName, worldName }: Props) {
       setSyncProgress({ loaded: i + 1, total })
     }
 
-    const now = Date.now()
-    setSyncedAt(now)
+    setSyncedAt(Date.now())
     setCachedMemberList(worldName, guildName, oguildId, storedMembers).catch(() => {})
     setSyncing(false)
   }
@@ -180,7 +178,6 @@ export default function MemberList({ guildName, worldName }: Props) {
         const hit = await loadFromCache(signal)
         if (hit || signal.aborted) return
       }
-      // 캐시 없음 or 강제 새로고침
       await syncFromApi(signal)
     } catch (err) {
       if (signal.aborted) return
@@ -205,12 +202,9 @@ export default function MemberList({ guildName, worldName }: Props) {
       m.characterClass.toLowerCase().includes(search.toLowerCase()),
   )
 
-  function openGroupModal(characterName: string) {
+  function openAltModal(characterName: string) {
     const member = members.find((m) => m.characterName === characterName)
-    const existingGroup = member?.playerGroupId
-      ? ({ id: member.playerGroupId, characterNames: [characterName, ...member.alts.map((a) => a.characterName)] } as PlayerGroup)
-      : undefined
-    setGroupModal({ characterName, existingGroup })
+    setAltModal({ characterName, altNames: member?.linkedAltNames ?? [] })
   }
 
   return (
@@ -238,10 +232,36 @@ export default function MemberList({ guildName, worldName }: Props) {
             </span>
           )}
         </div>
-        <Button size="sm" variant="secondary" onClick={() => load(true)} disabled={syncing}>
-          <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
-          새로고침
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="flex rounded-lg border border-gray-200 bg-white p-0.5">
+            <button
+              onClick={() => setViewMode('card')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === 'card'
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <LayoutGrid size={13} />
+              카드
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                viewMode === 'table'
+                  ? 'bg-amber-500 text-white shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              <Table2 size={13} />
+              표
+            </button>
+          </div>
+          <Button size="sm" variant="secondary" onClick={() => load(true)} disabled={syncing}>
+            <RefreshCw size={14} className={syncing ? 'animate-spin' : ''} />
+            새로고침
+          </Button>
+        </div>
       </div>
 
       {/* 변경 알림 */}
@@ -262,7 +282,7 @@ export default function MemberList({ guildName, worldName }: Props) {
         </div>
       )}
 
-      {/* 새로고침 진행 바 (캐시 로드 시엔 표시 안 함) */}
+      {/* 새로고침 진행 바 */}
       {syncing && (
         <div className="mb-4 rounded-xl border border-amber-100 bg-amber-50 p-4">
           <div className="mb-2 flex items-center justify-between text-sm">
@@ -307,11 +327,15 @@ export default function MemberList({ guildName, worldName }: Props) {
       )}
 
       {filtered.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {filtered.map((m) => (
-            <MemberCard key={m.characterName} member={m} currentGuildName={guildName} onManageGroup={openGroupModal} />
-          ))}
-        </div>
+        viewMode === 'card' ? (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {filtered.map((m) => (
+              <MemberCard key={m.characterName} member={m} currentGuildName={guildName} onManageGroup={openAltModal} />
+            ))}
+          </div>
+        ) : (
+          <MemberTable members={filtered} currentGuildName={guildName} onManageGroup={openAltModal} />
+        )
       )}
 
       {!syncing && !error && members.length === 0 && (
@@ -321,11 +345,11 @@ export default function MemberList({ guildName, worldName }: Props) {
         <p className="py-8 text-center text-sm text-gray-400">검색 결과가 없습니다.</p>
       )}
 
-      {groupModal && (
+      {altModal && (
         <ManagePlayerGroupModal
-          initialCharacterName={groupModal.characterName}
-          existing={groupModal.existingGroup}
-          onClose={() => setGroupModal(null)}
+          characterName={altModal.characterName}
+          initialAltNames={altModal.altNames}
+          onClose={() => setAltModal(null)}
           onSaved={() => load(false)}
         />
       )}
