@@ -11,10 +11,12 @@ import { getAltLinkMaps } from '../services/altLinkService'
 import {
   getNobleMap,
   getNobleCountMap,
+  getBirthDateMap,
   setNoble,
   setNobleBulk,
   setNobleCount,
   setNobleCountBulk,
+  setBirthDate,
 } from '../services/memberDataService'
 import { writeAuditLogSilently } from '../services/auditLogService'
 import { useAuth } from '../contexts/AuthContext'
@@ -55,7 +57,7 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
   const [altModal, setAltModal]         = useState<{ characterName: string; altNames: string[] } | null>(null)
   const [showBulkNobleEdit, setShowBulkNobleEdit] = useState(false)
   const [showBulkNobleCountEdit, setShowBulkNobleCountEdit] = useState(false)
-  const [viewMode, setViewMode]         = useState<'card' | 'table'>('card')
+  const [viewMode, setViewMode]         = useState<'card' | 'table'>('table')
 
   const abortRef = useRef<AbortController | null>(null)
 
@@ -67,10 +69,11 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
     setSyncedAt(cache.cachedAt.toMillis())
     setFromCache(true)
 
-    const [linkMaps, nobleMap, nobleCountMap] = await Promise.all([
+    const [linkMaps, nobleMap, nobleCountMap, birthDateMap] = await Promise.all([
       getAltLinkMaps(cache.memberNames),
       getNobleMap(cache.memberNames),
       getNobleCountMap(cache.memberNames),
+      getBirthDateMap(cache.memberNames),
     ])
     const altMap = linkMaps.altMap
     const mainMap = linkMaps.mainMap
@@ -85,6 +88,7 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
       mainCharacterName: mainMap.get(m.characterName),
       noble: nobleMap.get(m.characterName) ?? false,
       nobleCount: nobleCountMap.get(m.characterName) ?? 0,
+      birthDate: birthDateMap.get(m.characterName) ?? '',
       isNew: false,
       alts: [],
     }))
@@ -154,10 +158,11 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
 
     const addedSet = new Set(memberDiff.added)
     const total    = currentNames.length
-    const [linkMaps, nobleMap, nobleCountMap] = await Promise.all([
+    const [linkMaps, nobleMap, nobleCountMap, birthDateMap] = await Promise.all([
       getAltLinkMaps(currentNames),
       getNobleMap(currentNames),
       getNobleCountMap(currentNames),
+      getBirthDateMap(currentNames),
     ])
     const altMap = linkMaps.altMap
     const mainMap = linkMaps.mainMap
@@ -200,6 +205,7 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
         mainCharacterName: mainMap.get(name),
         noble: nobleMap.get(name) ?? false,
         nobleCount: nobleCountMap.get(name) ?? 0,
+        birthDate: birthDateMap.get(name) ?? '',
         isNew,
         alts,
       })
@@ -288,7 +294,7 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
   }
 
   async function handleUpdateNobleCount(characterName: string, count: number) {
-    const normalizedCount = Math.max(0, Math.min(3, Math.floor(count)))
+    const normalizedCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0
     setMembers((prev) =>
       prev.map((m) => m.characterName === characterName ? { ...m, nobleCount: normalizedCount } : m),
     )
@@ -304,6 +310,31 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
         name: profile?.displayName,
       },
       meta: { guildName, worldName, nobleCount: normalizedCount },
+    })
+  }
+
+  async function handleUpdateBirthDate(characterName: string, birthDate: string) {
+    const digitsOnly = birthDate.trim().replace(/\D/g, '')
+    if (digitsOnly.length > 0 && digitsOnly.length < 4) {
+      alert('연생은 4자리 연도만 입력해 주세요. (예: 1998)')
+      return
+    }
+    const normalized = digitsOnly.slice(0, 4)
+    setMembers((prev) =>
+      prev.map((m) => m.characterName === characterName ? { ...m, birthDate: normalized } : m),
+    )
+    await setBirthDate(characterName, normalized)
+    writeAuditLogSilently({
+      action: 'member.birthDate.update',
+      message: `생년월일 변경: ${characterName} -> ${normalized || '삭제'}`,
+      targetType: 'member',
+      targetId: characterName,
+      actor: {
+        uid: profile?.uid,
+        email: profile?.email,
+        name: profile?.displayName,
+      },
+      meta: { guildName, worldName, birthDate: normalized },
     })
   }
 
@@ -368,7 +399,7 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
 
     await setNobleCountBulk(matched, count)
     const matchedSet = new Set(matched)
-    const normalizedCount = Math.max(1, Math.min(3, Math.floor(count)))
+    const normalizedCount = Number.isFinite(count) ? Math.max(0, Math.floor(count)) : 0
     setMembers((prev) =>
       prev.map((m) => matchedSet.has(m.characterName) ? { ...m, nobleCount: normalizedCount } : m),
     )
@@ -556,6 +587,7 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
             onManageGroup={openAltModal}
             onToggleNoble={handleToggleNoble}
             onUpdateNobleCount={handleUpdateNobleCount}
+            onUpdateBirthDate={handleUpdateBirthDate}
             onOpenBulkNobleEdit={() => setShowBulkNobleEdit(true)}
             onOpenBulkNobleCountEdit={() => setShowBulkNobleCountEdit(true)}
             canEdit={canEdit}
@@ -718,7 +750,7 @@ function BulkNobleCountEditModal({
   onApply: (characterNames: string[], count: number) => Promise<{ updatedCount: number; notFound: string[] }>
 }) {
   const [rawNames, setRawNames] = useState('')
-  const [target, setTarget]     = useState<1 | 2 | 3>(1)
+  const [target, setTarget]     = useState(1)
   const [loading, setLoading]   = useState(false)
   const [error, setError]       = useState('')
 
@@ -731,12 +763,17 @@ function BulkNobleCountEditModal({
       setError('캐릭터명을 1개 이상 입력해 주세요.')
       return
     }
+    if (!Number.isFinite(target) || target < 0) {
+      setError('반영 값은 0 이상의 숫자로 입력해 주세요.')
+      return
+    }
+    const normalizedTarget = Math.max(0, Math.floor(target))
 
     setLoading(true)
     setError('')
     try {
-      const result = await onApply(names, target)
-      const summary = `누적 횟수 ${target}회로 ${result.updatedCount}명 반영했습니다.`
+      const result = await onApply(names, normalizedTarget)
+      const summary = `누적 횟수 ${normalizedTarget}회로 ${result.updatedCount}명 반영했습니다.`
       if (result.notFound.length > 0) {
         alert(`${summary}\n미일치 ${result.notFound.length}명: ${result.notFound.slice(0, 5).join(', ')}${result.notFound.length > 5 ? ' 외' : ''}`)
       } else {
@@ -782,22 +819,15 @@ function BulkNobleCountEditModal({
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700">반영 값</label>
-          <div className="flex items-center gap-2">
-            {[1, 2, 3].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setTarget(n as 1 | 2 | 3)}
-                className={`rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors ${
-                  target === n
-                    ? 'border-amber-300 bg-amber-100 text-amber-700'
-                    : 'border-gray-300 bg-white text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                {n}회
-              </button>
-            ))}
-          </div>
+          <input
+            type="number"
+            min={0}
+            step={1}
+            value={target}
+            onChange={(e) => setTarget(Number(e.target.value))}
+            className="w-28 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+          <p className="mt-1 text-xs text-gray-400">숫자를 입력하면 n회로 일괄 반영됩니다. (예: 7)</p>
         </div>
 
         {error && <p className="text-sm text-red-500">{error}</p>}

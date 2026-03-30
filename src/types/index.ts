@@ -77,6 +77,7 @@ export interface MemberView {
   mainCharacterName?: string // 본캐와 연결된 경우 본캐 이름
   noble: boolean            // 노블레스 여부 (memberData 컬렉션에 저장)
   nobleCount: number        // 노블 누적 횟수 (memberData 컬렉션에 저장)
+  birthDate?: string        // 생년월일 (YYYY-MM-DD)
   isNew: boolean            // 이번 로드에서 새로 감지된 신규 가입자
   alts: AltView[]           // Nexon API 조회된 부캐 상세 정보
 }

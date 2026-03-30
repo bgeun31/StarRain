@@ -13,6 +13,7 @@ interface Props {
   onManageGroup: (characterName: string) => void
   onToggleNoble: (characterName: string) => void
   onUpdateNobleCount: (characterName: string, count: number) => void
+  onUpdateBirthDate: (characterName: string, birthDate: string) => void
   onOpenBulkNobleEdit: () => void
   onOpenBulkNobleCountEdit: () => void
 }
@@ -31,6 +32,7 @@ export default function MemberTable({
   onManageGroup,
   onToggleNoble,
   onUpdateNobleCount,
+  onUpdateBirthDate,
   onOpenBulkNobleEdit,
   onOpenBulkNobleCountEdit,
 }: Props) {
@@ -102,6 +104,7 @@ export default function MemberTable({
                 )}
               </div>
             </th>
+            <th className="px-4 py-3 text-center">연생</th>
             <th className="px-4 py-3">상태</th>
             <th className="px-4 py-3">부캐릭터</th>
           </tr>
@@ -150,19 +153,34 @@ export default function MemberTable({
                 </td>
                 <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                   {canEdit ? (
-                    <select
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
                       value={m.nobleCount}
                       onChange={(e) => onUpdateNobleCount(m.characterName, Number(e.target.value))}
-                      className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
-                    >
-                      <option value={0}>-</option>
-                      <option value={1}>1회</option>
-                      <option value={2}>2회</option>
-                      <option value={3}>3회</option>
-                    </select>
+                      className="w-16 rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
                   ) : (
                     <span className={`text-xs font-semibold ${m.nobleCount > 0 ? 'text-amber-700' : 'text-gray-300'}`}>
                       {m.nobleCount > 0 ? `${m.nobleCount}회` : '-'}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                  {canEdit ? (
+                    <input
+                      key={`${m.characterName}-${m.birthDate ?? ''}`}
+                      type="text"
+                      inputMode="numeric"
+                      defaultValue={m.birthDate ?? ''}
+                      onBlur={(e) => onUpdateBirthDate(m.characterName, e.target.value)}
+                      placeholder="YYYY"
+                      className="w-20 rounded-lg border border-gray-300 bg-white px-2 py-1 text-center text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    />
+                  ) : (
+                    <span className={`text-xs font-semibold ${m.birthDate ? 'text-gray-700' : 'text-gray-300'}`}>
+                      {m.birthDate || '-'}
                     </span>
                   )}
                 </td>
@@ -176,20 +194,26 @@ export default function MemberTable({
                 </td>
                 <td className="px-4 py-3">
                   {displayAlts.length > 0 ? (
-                    <span className="text-gray-600">
-                      {displayAlts.map((name, i) => {
+                    <ul className="ml-2 space-y-1 text-gray-600">
+                      {displayAlts.map((name) => {
                         const alt = m.alts.find((a) => a.characterName === name)
                         const inOtherGuild = alt && alt.guildName !== currentGuildName
                         return (
-                          <span key={name}>
-                            {i > 0 && <span className="text-gray-300 mx-1">·</span>}
+                          <li key={name} className="leading-5">
                             <span className={inOtherGuild ? 'text-orange-500 font-medium' : ''}>
                               {name}
+                              {alt?.guildName ? (
+                                <span className={`ml-1 ${inOtherGuild ? 'text-orange-400' : 'text-gray-400'}`}>
+                                  ({alt.guildName})
+                                </span>
+                              ) : (
+                                <span className="ml-1 text-gray-300">(조회중)</span>
+                              )}
                             </span>
-                          </span>
+                          </li>
                         )
                       })}
-                    </span>
+                    </ul>
                   ) : (
                     <span className="text-gray-300">—</span>
                   )}

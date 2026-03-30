@@ -5,6 +5,7 @@ import GuildPage from './pages/GuildPage'
 import UserManagePage from './pages/UserManagePage'
 import AuditLogPage from './pages/AuditLogPage'
 import MemberChangeLogPage from './pages/MemberChangeLogPage'
+import MemberInfoPage from './pages/MemberInfoPage'
 import Button from './components/ui/Button'
 
 function AccessDeniedScreen() {
@@ -33,7 +34,7 @@ function AccessDeniedScreen() {
 
 function AppRoutes() {
   const { user, profile, loading } = useAuth()
-  const [page, setPage] = useState<'guild' | 'users' | 'audit' | 'memberChanges'>('guild')
+  const [page, setPage] = useState<'guild' | 'users' | 'audit' | 'memberChanges' | 'memberInfo'>('guild')
 
   if (loading) {
     return (
@@ -59,8 +60,13 @@ function AppRoutes() {
     return <MemberChangeLogPage onBack={() => setPage('guild')} />
   }
 
+  if (page === 'memberInfo') {
+    return <MemberInfoPage onBack={() => setPage('guild')} />
+  }
+
   return (
     <GuildPage
+      onNavigateMemberInfo={() => setPage('memberInfo')}
       onNavigateMemberChanges={() => setPage('memberChanges')}
       onNavigateUsers={() => setPage('users')}
       onNavigateAudit={() => setPage('audit')}
