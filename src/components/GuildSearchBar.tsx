@@ -6,13 +6,14 @@ import type { MapleWorld } from '../types'
 
 interface Props {
   onSearch: (guildName: string, worldName: string) => void
-  onSave: (guildName: string, worldName: string) => void
+  onSave: (guildName: string, worldName: string, icon?: string) => void
   loading: boolean
 }
 
 export default function GuildSearchBar({ onSearch, onSave, loading }: Props) {
   const [guildName, setGuildName] = useState('')
   const [worldName, setWorldName] = useState<MapleWorld>('스카니아')
+  const [icon, setIcon]           = useState('')
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -47,6 +48,17 @@ export default function GuildSearchBar({ onSearch, onSave, loading }: Props) {
         />
       </div>
 
+      <div className="w-44">
+        <label className="mb-1 block text-xs font-medium text-gray-500">아이콘(선택)</label>
+        <input
+          type="text"
+          value={icon}
+          onChange={(e) => setIcon(e.target.value)}
+          placeholder="😀 또는 이미지 URL"
+          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+        />
+      </div>
+
       <Button type="submit" disabled={loading || !guildName.trim()}>
         <Search size={15} />
         {loading ? '조회 중...' : '조회'}
@@ -56,7 +68,7 @@ export default function GuildSearchBar({ onSearch, onSave, loading }: Props) {
         type="button"
         variant="secondary"
         disabled={!guildName.trim()}
-        onClick={() => onSave(guildName.trim(), worldName)}
+        onClick={() => onSave(guildName.trim(), worldName, icon.trim())}
         title="즐겨찾기에 추가"
       >
         <BookmarkPlus size={15} />

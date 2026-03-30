@@ -31,11 +31,14 @@ export default function GuildSelector({ guilds, selectedId, onSelect, onRemove }
             }`}
             onClick={() => onSelect(g)}
           >
-            <div className="min-w-0">
-              <p className="truncate text-sm font-medium">{g.guildName}</p>
-              <p className={`text-xs ${selectedId === g.id ? 'text-amber-100' : 'text-gray-400'}`}>
-                {g.worldName}
-              </p>
+            <div className="flex min-w-0 items-center gap-2">
+              <GuildIcon icon={g.icon} guildName={g.guildName} selected={selectedId === g.id} />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{g.guildName}</p>
+                <p className={`text-xs ${selectedId === g.id ? 'text-amber-100' : 'text-gray-400'}`}>
+                  {g.worldName}
+                </p>
+              </div>
             </div>
             {onRemove && (
               <button
@@ -52,5 +55,36 @@ export default function GuildSelector({ guilds, selectedId, onSelect, onRemove }
         </li>
       ))}
     </ul>
+  )
+}
+
+function GuildIcon({ icon, guildName, selected }: { icon?: string; guildName: string; selected: boolean }) {
+  const value = (icon ?? '').trim()
+  const isImage = value.startsWith('http://') || value.startsWith('https://')
+
+  if (isImage) {
+    return (
+      <img
+        src={value}
+        alt={`${guildName} 아이콘`}
+        className="h-7 w-7 shrink-0 rounded-full object-cover ring-1 ring-black/5"
+      />
+    )
+  }
+
+  if (value) {
+    return (
+      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white/70 text-base leading-none">
+        {value}
+      </span>
+    )
+  }
+
+  return (
+    <span className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+      selected ? 'bg-amber-400 text-white' : 'bg-gray-200 text-gray-600'
+    }`}>
+      {guildName.slice(0, 1)}
+    </span>
   )
 }

@@ -4,6 +4,7 @@ import {
   getDocs,
   addDoc,
   deleteDoc,
+  updateDoc,
   serverTimestamp,
   query,
   orderBy,
@@ -20,7 +21,9 @@ export async function fetchSavedGuilds(): Promise<SavedGuild[]> {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as SavedGuild))
 }
 
-export async function saveGuild(guildName: string, worldName: string): Promise<string> {
+export async function saveGuild(guildName: string, worldName: string, icon?: string): Promise<string> {
+  const normalizedIcon = (icon ?? '').trim()
+
   // 중복 저장 방지
   const dup = query(
     collection(db, COL),
@@ -28,11 +31,19 @@ export async function saveGuild(guildName: string, worldName: string): Promise<s
     where('worldName', '==', worldName),
   )
   const snap = await getDocs(dup)
-  if (!snap.empty) return snap.docs[0].id
+  if (!snap.empty) {
+    const existing = snap.docs[0]
+    const existingIcon = ((existing.data().icon as string | undefined) ?? '').trim()
+    if (normalizedIcon !== existingIcon) {
+      await updateDoc(existing.ref, { icon: normalizedIcon })
+    }
+    return existing.id
+  }
 
   const ref = await addDoc(collection(db, COL), {
     guildName,
     worldName,
+    icon: normalizedIcon,
     createdAt: serverTimestamp(),
   })
   return ref.id

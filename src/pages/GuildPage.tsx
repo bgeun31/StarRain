@@ -43,12 +43,12 @@ export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
     setSearching(false)
   }
 
-  async function handleSave(guildName: string, worldName: string) {
+  async function handleSave(guildName: string, worldName: string, icon?: string) {
     try {
-      await saveGuild(guildName, worldName)
+      await saveGuild(guildName, worldName, icon)
       writeAuditLogSilently({
         action: 'savedGuild.create',
-        message: `즐겨찾기 추가: ${worldName}/${guildName}`,
+        message: `즐겨찾기 추가: ${worldName}/${guildName}${icon ? ' (아이콘 포함)' : ''}`,
         targetType: 'savedGuild',
         targetId: `${worldName}:${guildName}`,
         actor: {
@@ -56,7 +56,7 @@ export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
           email: profile?.email,
           name: profile?.displayName,
         },
-        meta: { guildName, worldName },
+        meta: { guildName, worldName, icon: icon ?? '' },
       })
       await loadSaved()
     } catch (err) {
