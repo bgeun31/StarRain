@@ -76,3 +76,7 @@ export async function updateSavedGuildOrder(orderedIds: string[]): Promise<void>
   })
   await batch.commit()
 }
+
+export async function updateSavedGuildIcon(id: string, icon: string): Promise<void> {
+  await updateDoc(doc(db, COL, id), { icon: icon.trim() })
+}

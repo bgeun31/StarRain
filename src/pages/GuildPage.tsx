@@ -4,7 +4,8 @@ import { Shield, Bookmark, Users, LogOut, ClipboardList, RefreshCw } from 'lucid
 import GuildSearchBar from '../components/GuildSearchBar'
 import GuildSelector from '../components/GuildSelector'
 import MemberList from '../components/MemberList'
-import { fetchSavedGuilds, saveGuild, removeSavedGuild, updateSavedGuildOrder } from '../services/savedGuildService'
+import { fetchSavedGuilds, saveGuild, removeSavedGuild, updateSavedGuildOrder, updateSavedGuildIcon } from '../services/savedGuildService'
+import { uploadSavedGuildIcon } from '../services/savedGuildIconStorageService'
 import { writeAuditLogSilently } from '../services/auditLogService'
 import { useAuth } from '../contexts/AuthContext'
 import type { SavedGuild } from '../types'
@@ -26,6 +27,7 @@ export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null)
   const [searching, setSearching]             = useState(false)
   const [memberLoading, setMemberLoading]     = useState(false)
+  const [iconUpdatingId, setIconUpdatingId]   = useState<string | null>(null)
 
   useEffect(() => { loadSaved() }, [])
 
@@ -45,12 +47,12 @@ export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
     setSearching(false)
   }
 
-  async function handleSave(guildName: string, worldName: string, icon?: string) {
+  async function handleSave(guildName: string, worldName: string) {
     try {
-      await saveGuild(guildName, worldName, icon)
+      await saveGuild(guildName, worldName)
       writeAuditLogSilently({
         action: 'savedGuild.create',
-        message: `즐겨찾기 추가: ${worldName}/${guildName}${icon ? ' (아이콘 포함)' : ''}`,
+        message: `즐겨찾기 추가: ${worldName}/${guildName}`,
         targetType: 'savedGuild',
         targetId: `${worldName}:${guildName}`,
         actor: {
@@ -58,7 +60,7 @@ export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
           email: profile?.email,
           name: profile?.displayName,
         },
-        meta: { guildName, worldName, icon: icon ?? '' },
+        meta: { guildName, worldName },
       })
       await loadSaved()
     } catch (err) {
@@ -128,6 +130,46 @@ export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
     } catch (err) {
       console.error(err)
       await loadSaved()
+    }
+  }
+
+  async function handleEditSavedIcon(guild: SavedGuild, file: File) {
+    if (!file.type.startsWith('image/')) {
+      alert('이미지 파일만 업로드할 수 있습니다.')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      alert('이미지는 5MB 이하만 업로드할 수 있습니다.')
+      return
+    }
+
+    setIconUpdatingId(guild.id)
+    try {
+      const iconUrl = await uploadSavedGuildIcon(guild.id, file)
+      await updateSavedGuildIcon(guild.id, iconUrl)
+      setSavedGuilds((prev) => prev.map((g) => (g.id === guild.id ? { ...g, icon: iconUrl } : g)))
+      writeAuditLogSilently({
+        action: 'savedGuild.icon.update',
+        message: `즐겨찾기 아이콘 변경: ${guild.worldName}/${guild.guildName}`,
+        targetType: 'savedGuild',
+        targetId: guild.id,
+        actor: {
+          uid: profile?.uid,
+          email: profile?.email,
+          name: profile?.displayName,
+        },
+        meta: { guildName: guild.guildName, worldName: guild.worldName },
+      })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '아이콘 업로드 중 오류가 발생했습니다.'
+      if (msg.includes('storage/unauthorized') || msg.includes('permission-denied')) {
+        alert('Storage 권한이 없습니다. Storage 보안 규칙을 확인해 주세요.')
+      } else {
+        alert('아이콘 업로드에 실패했습니다.')
+      }
+      console.error(err)
+    } finally {
+      setIconUpdatingId(null)
     }
   }
 
@@ -204,6 +246,8 @@ export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
             guilds={savedGuilds}
             selectedId={selectedSavedId}
             onSelect={handleSelectSaved}
+            onEditIcon={canEdit ? handleEditSavedIcon : undefined}
+            iconUpdatingId={iconUpdatingId}
             onRemove={canEdit ? handleRemoveSaved : undefined}
             onReorder={canEdit ? handleReorderSavedGuilds : undefined}
           />

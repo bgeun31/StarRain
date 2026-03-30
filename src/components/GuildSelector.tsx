@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Trash2, Shield, GripVertical } from 'lucide-react'
+import { Trash2, Shield, GripVertical, Pencil, Loader2 } from 'lucide-react'
 import type { SavedGuild } from '../types'
 
 interface Props {
@@ -7,10 +7,20 @@ interface Props {
   selectedId: string | null
   onSelect: (guild: SavedGuild) => void
   onRemove?: (guild: SavedGuild) => void
+  onEditIcon?: (guild: SavedGuild, file: File) => void
+  iconUpdatingId?: string | null
   onReorder?: (orderedIds: string[]) => void
 }
 
-export default function GuildSelector({ guilds, selectedId, onSelect, onRemove, onReorder }: Props) {
+export default function GuildSelector({
+  guilds,
+  selectedId,
+  onSelect,
+  onRemove,
+  onEditIcon,
+  iconUpdatingId,
+  onReorder,
+}: Props) {
   const [dragId, setDragId] = useState<string | null>(null)
   const [overId, setOverId] = useState<string | null>(null)
 
@@ -90,15 +100,40 @@ export default function GuildSelector({ guilds, selectedId, onSelect, onRemove, 
               </div>
             </div>
             {onRemove && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onRemove(g) }}
-                className={`ml-2 shrink-0 rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${
-                  selectedId === g.id ? 'hover:bg-amber-600 text-white' : 'hover:bg-red-100 text-red-400'
-                }`}
-                title="즐겨찾기 삭제"
-              >
-                <Trash2 size={14} />
-              </button>
+              <div className="ml-2 flex shrink-0 items-center gap-1.5">
+                {onEditIcon && (
+                  <label
+                    onClick={(e) => e.stopPropagation()}
+                    className={`rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer ${
+                      selectedId === g.id ? 'hover:bg-amber-600 text-white' : 'hover:bg-amber-100 text-amber-500'
+                    }`}
+                    title="아이콘 수정"
+                  >
+                    {iconUpdatingId === g.id ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      disabled={iconUpdatingId === g.id}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (!file) return
+                        onEditIcon(g, file)
+                        e.currentTarget.value = ''
+                      }}
+                    />
+                  </label>
+                )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); onRemove(g) }}
+                  className={`rounded p-0.5 opacity-0 group-hover:opacity-100 transition-opacity ${
+                    selectedId === g.id ? 'hover:bg-amber-600 text-white' : 'hover:bg-red-100 text-red-400'
+                  }`}
+                  title="즐겨찾기 삭제"
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             )}
           </div>
         </li>
