@@ -8,7 +8,14 @@ import Modal from './ui/Modal'
 import { fetchGuildId, fetchGuildBasic } from '../services/mapleApiService'
 import { getOrFetchCharacter } from '../services/characterCacheService'
 import { getAltNamesMap } from '../services/altLinkService'
-import { getNobleMap, setNoble, setNobleBulk } from '../services/memberDataService'
+import {
+  getNobleMap,
+  getNobleCountMap,
+  setNoble,
+  setNobleBulk,
+  setNobleCount,
+  setNobleCountBulk,
+} from '../services/memberDataService'
 import { writeAuditLogSilently } from '../services/auditLogService'
 import { useAuth } from '../contexts/AuthContext'
 import {
@@ -47,6 +54,7 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
   const [search, setSearch]             = useState('')
   const [altModal, setAltModal]         = useState<{ characterName: string; altNames: string[] } | null>(null)
   const [showBulkNobleEdit, setShowBulkNobleEdit] = useState(false)
+  const [showBulkNobleCountEdit, setShowBulkNobleCountEdit] = useState(false)
   const [viewMode, setViewMode]         = useState<'card' | 'table'>('card')
 
   const abortRef = useRef<AbortController | null>(null)
@@ -59,9 +67,10 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
     setSyncedAt(cache.cachedAt.toMillis())
     setFromCache(true)
 
-    const [altMap, nobleMap] = await Promise.all([
+    const [altMap, nobleMap, nobleCountMap] = await Promise.all([
       getAltNamesMap(cache.memberNames),
       getNobleMap(cache.memberNames),
+      getNobleCountMap(cache.memberNames),
     ])
     if (signal.aborted) return true
 
@@ -72,6 +81,7 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
       guildName: m.guildName ?? guildName,
       linkedAltNames: altMap.get(m.characterName) ?? [],
       noble: nobleMap.get(m.characterName) ?? false,
+      nobleCount: nobleCountMap.get(m.characterName) ?? 0,
       isNew: false,
       alts: [],
     }))
@@ -121,9 +131,10 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
 
     const addedSet = new Set(memberDiff.added)
     const total    = currentNames.length
-    const [altMap, nobleMap] = await Promise.all([
+    const [altMap, nobleMap, nobleCountMap] = await Promise.all([
       getAltNamesMap(currentNames),
       getNobleMap(currentNames),
+      getNobleCountMap(currentNames),
     ])
     if (signal.aborted) return
 
@@ -162,6 +173,7 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
         guildName: info?.character_guild_name ?? guildName,
         linkedAltNames: altNames,
         noble: nobleMap.get(name) ?? false,
+        nobleCount: nobleCountMap.get(name) ?? 0,
         isNew,
         alts,
       })
@@ -249,6 +261,26 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
     })
   }
 
+  async function handleUpdateNobleCount(characterName: string, count: number) {
+    const normalizedCount = Math.max(0, Math.min(3, Math.floor(count)))
+    setMembers((prev) =>
+      prev.map((m) => m.characterName === characterName ? { ...m, nobleCount: normalizedCount } : m),
+    )
+    await setNobleCount(characterName, normalizedCount)
+    writeAuditLogSilently({
+      action: 'member.nobleCount.update',
+      message: `누적 횟수 변경: ${characterName} -> ${normalizedCount}회`,
+      targetType: 'member',
+      targetId: characterName,
+      actor: {
+        uid: profile?.uid,
+        email: profile?.email,
+        name: profile?.displayName,
+      },
+      meta: { guildName, worldName, nobleCount: normalizedCount },
+    })
+  }
+
   async function handleBulkNobleUpdate(characterNames: string[], noble: boolean) {
     const normalized = Array.from(
       new Set(characterNames.map((name) => name.trim()).filter(Boolean)),
@@ -284,6 +316,51 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
         guildName,
         worldName,
         noble,
+        updatedCount: matched.length,
+        notFoundCount: notFound.length,
+        targets: matched.slice(0, 200),
+      },
+    })
+
+    return { updatedCount: matched.length, notFound }
+  }
+
+  async function handleBulkNobleCountUpdate(characterNames: string[], count: number) {
+    const normalized = Array.from(
+      new Set(characterNames.map((name) => name.trim()).filter(Boolean)),
+    )
+    if (normalized.length === 0) {
+      throw new Error('캐릭터명을 1개 이상 입력해 주세요.')
+    }
+
+    const memberNameSet = new Set(members.map((m) => m.characterName))
+    const matched = normalized.filter((name) => memberNameSet.has(name))
+    const notFound = normalized.filter((name) => !memberNameSet.has(name))
+    if (matched.length === 0) {
+      throw new Error('입력한 이름 중 일치하는 길드원이 없습니다.')
+    }
+
+    await setNobleCountBulk(matched, count)
+    const matchedSet = new Set(matched)
+    const normalizedCount = Math.max(1, Math.min(3, Math.floor(count)))
+    setMembers((prev) =>
+      prev.map((m) => matchedSet.has(m.characterName) ? { ...m, nobleCount: normalizedCount } : m),
+    )
+
+    writeAuditLogSilently({
+      action: 'member.nobleCount.bulkUpdate',
+      message: `누적 횟수 일괄 변경: ${matched.length}명 -> ${normalizedCount}회`,
+      targetType: 'member',
+      targetId: `${worldName}:${guildName}`,
+      actor: {
+        uid: profile?.uid,
+        email: profile?.email,
+        name: profile?.displayName,
+      },
+      meta: {
+        guildName,
+        worldName,
+        nobleCount: normalizedCount,
         updatedCount: matched.length,
         notFoundCount: notFound.length,
         targets: matched.slice(0, 200),
@@ -425,7 +502,9 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
             currentGuildName={guildName}
             onManageGroup={openAltModal}
             onToggleNoble={handleToggleNoble}
+            onUpdateNobleCount={handleUpdateNobleCount}
             onOpenBulkNobleEdit={() => setShowBulkNobleEdit(true)}
+            onOpenBulkNobleCountEdit={() => setShowBulkNobleCountEdit(true)}
             canEdit={canEdit}
           />
         )
@@ -450,6 +529,12 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
         <BulkNobleEditModal
           onClose={() => setShowBulkNobleEdit(false)}
           onApply={handleBulkNobleUpdate}
+        />
+      )}
+      {showBulkNobleCountEdit && (
+        <BulkNobleCountEditModal
+          onClose={() => setShowBulkNobleCountEdit(false)}
+          onApply={handleBulkNobleCountUpdate}
         />
       )}
     </div>
@@ -536,6 +621,94 @@ function BulkNobleEditModal({
             >
               X
             </button>
+          </div>
+        </div>
+
+        {error && <p className="text-sm text-red-500">{error}</p>}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>취소</Button>
+          <Button type="submit" disabled={loading}>
+            {loading ? '반영 중...' : '일괄 반영'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+function BulkNobleCountEditModal({
+  onClose,
+  onApply,
+}: {
+  onClose: () => void
+  onApply: (characterNames: string[], count: number) => Promise<{ updatedCount: number; notFound: string[] }>
+}) {
+  const [rawNames, setRawNames] = useState('')
+  const [target, setTarget]     = useState<1 | 2 | 3>(1)
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const names = Array.from(
+      new Set(rawNames.split(/[\n,]/).map((name) => name.trim()).filter(Boolean)),
+    )
+    if (names.length === 0) {
+      setError('캐릭터명을 1개 이상 입력해 주세요.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    try {
+      const result = await onApply(names, target)
+      const summary = `누적 횟수 ${target}회로 ${result.updatedCount}명 반영했습니다.`
+      if (result.notFound.length > 0) {
+        alert(`${summary}\n미일치 ${result.notFound.length}명: ${result.notFound.slice(0, 5).join(', ')}${result.notFound.length > 5 ? ' 외' : ''}`)
+      } else {
+        alert(summary)
+      }
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '일괄 수정 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal title="누적 횟수 일괄 수정" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">캐릭터명</label>
+          <textarea
+            value={rawNames}
+            onChange={(e) => setRawNames(e.target.value)}
+            placeholder={'캐릭터명1\n캐릭터명2, 캐릭터명3'}
+            rows={6}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+          <p className="mt-1 text-xs text-gray-400">줄바꿈 또는 콤마(,)로 여러 명을 입력할 수 있습니다.</p>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">반영 값</label>
+          <div className="flex items-center gap-2">
+            {[1, 2, 3].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => setTarget(n as 1 | 2 | 3)}
+                className={`rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors ${
+                  target === n
+                    ? 'border-amber-300 bg-amber-100 text-amber-700'
+                    : 'border-gray-300 bg-white text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                {n}회
+              </button>
+            ))}
           </div>
         </div>
 

@@ -12,7 +12,9 @@ interface Props {
   canEdit: boolean
   onManageGroup: (characterName: string) => void
   onToggleNoble: (characterName: string) => void
+  onUpdateNobleCount: (characterName: string, count: number) => void
   onOpenBulkNobleEdit: () => void
+  onOpenBulkNobleCountEdit: () => void
 }
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
@@ -28,7 +30,9 @@ export default function MemberTable({
   canEdit,
   onManageGroup,
   onToggleNoble,
+  onUpdateNobleCount,
   onOpenBulkNobleEdit,
+  onOpenBulkNobleCountEdit,
 }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('level')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
@@ -85,6 +89,19 @@ export default function MemberTable({
                 )}
               </div>
             </th>
+            <th className="px-4 py-3 text-center">
+              <div className="flex items-center justify-center gap-2">
+                <span>누적 횟수</span>
+                {canEdit && (
+                  <button
+                    onClick={onOpenBulkNobleCountEdit}
+                    className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+                  >
+                    일괄 수정
+                  </button>
+                )}
+              </div>
+            </th>
             <th className="px-4 py-3">상태</th>
             <th className="px-4 py-3">부캐릭터</th>
           </tr>
@@ -127,6 +144,24 @@ export default function MemberTable({
                   ) : (
                     <span className={`text-xs font-bold ${m.noble ? 'text-amber-600' : 'text-gray-300'}`}>
                       {m.noble ? 'O' : 'X'}
+                    </span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
+                  {canEdit ? (
+                    <select
+                      value={m.nobleCount}
+                      onChange={(e) => onUpdateNobleCount(m.characterName, Number(e.target.value))}
+                      className="rounded-lg border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    >
+                      <option value={0}>-</option>
+                      <option value={1}>1회</option>
+                      <option value={2}>2회</option>
+                      <option value={3}>3회</option>
+                    </select>
+                  ) : (
+                    <span className={`text-xs font-semibold ${m.nobleCount > 0 ? 'text-amber-700' : 'text-gray-300'}`}>
+                      {m.nobleCount > 0 ? `${m.nobleCount}회` : '-'}
                     </span>
                   )}
                 </td>
