@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Plus, X } from 'lucide-react'
+import { Plus, X, ArrowUp, ArrowDown } from 'lucide-react'
 import Modal from './ui/Modal'
 import Button from './ui/Button'
 import { syncAltNames } from '../services/altLinkService'
@@ -36,6 +36,17 @@ export default function ManagePlayerGroupModal({
 
   function updateRow(i: number, val: string) {
     setAltNamesState((prev) => prev.map((v, idx) => (idx === i ? val : v)))
+  }
+
+  function moveRow(i: number, dir: -1 | 1) {
+    setAltNamesState((prev) => {
+      const nextIndex = i + dir
+      if (nextIndex < 0 || nextIndex >= prev.length) return prev
+      const next = [...prev]
+      const [picked] = next.splice(i, 1)
+      next.splice(nextIndex, 0, picked)
+      return next
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -84,6 +95,24 @@ export default function ManagePlayerGroupModal({
                 placeholder={`부캐릭터명 ${i + 1}`}
                 className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
               />
+              <button
+                type="button"
+                onClick={() => moveRow(i, -1)}
+                disabled={i === 0}
+                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="위로 이동"
+              >
+                <ArrowUp size={14} />
+              </button>
+              <button
+                type="button"
+                onClick={() => moveRow(i, 1)}
+                disabled={i === altNames.length - 1}
+                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                title="아래로 이동"
+              >
+                <ArrowDown size={14} />
+              </button>
               <button
                 type="button"
                 onClick={() => removeRow(i)}
