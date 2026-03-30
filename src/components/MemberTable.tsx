@@ -12,6 +12,7 @@ interface Props {
   canEdit: boolean
   onManageGroup: (characterName: string) => void
   onToggleNoble: (characterName: string) => void
+  onOpenBulkNobleEdit: () => void
 }
 
 function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; sortDir: SortDir }) {
@@ -21,7 +22,14 @@ function SortIcon({ col, sortKey, sortDir }: { col: SortKey; sortKey: SortKey; s
     : <ChevronDown size={13} className="text-amber-500" />
 }
 
-export default function MemberTable({ members, currentGuildName, canEdit, onManageGroup, onToggleNoble }: Props) {
+export default function MemberTable({
+  members,
+  currentGuildName,
+  canEdit,
+  onManageGroup,
+  onToggleNoble,
+  onOpenBulkNobleEdit,
+}: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('level')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
 
@@ -65,6 +73,16 @@ export default function MemberTable({ members, currentGuildName, canEdit, onMana
             </th>
             <th className="px-4 py-3">직업</th>
             <th className="px-4 py-3 text-center">노블</th>
+            {canEdit && (
+              <th className="px-2 py-3 text-center">
+                <button
+                  onClick={onOpenBulkNobleEdit}
+                  className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-100"
+                >
+                  일괄 수정
+                </button>
+              </th>
+            )}
             <th className="px-4 py-3">상태</th>
             <th className="px-4 py-3">부캐릭터</th>
           </tr>
@@ -110,6 +128,7 @@ export default function MemberTable({ members, currentGuildName, canEdit, onMana
                     </span>
                   )}
                 </td>
+                {canEdit && <td className="px-2 py-3 text-center text-gray-200">—</td>}
                 <td className="px-4 py-3">
                   {hasAlts
                     ? <Badge variant="main">부캐 있음</Badge>

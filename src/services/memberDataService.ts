@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, setDoc } from 'firebase/firestore'
+import { collection, doc, getDocs, setDoc, writeBatch } from 'firebase/firestore'
 import { db } from '../lib/firebase'
 
 const COL = 'memberData'
@@ -20,4 +20,21 @@ export async function getNobleMap(
 /** 노블 여부 저장 */
 export async function setNoble(characterName: string, noble: boolean): Promise<void> {
   await setDoc(doc(db, COL, characterName), { noble }, { merge: true })
+}
+
+/** 여러 캐릭터의 노블 여부 일괄 저장 */
+export async function setNobleBulk(characterNames: string[], noble: boolean): Promise<void> {
+  const uniqueNames = Array.from(
+    new Set(characterNames.map((name) => name.trim()).filter(Boolean)),
+  )
+  if (uniqueNames.length === 0) return
+
+  const chunkSize = 450
+  for (let i = 0; i < uniqueNames.length; i += chunkSize) {
+    const batch = writeBatch(db)
+    for (const name of uniqueNames.slice(i, i + chunkSize)) {
+      batch.set(doc(db, COL, name), { noble }, { merge: true })
+    }
+    await batch.commit()
+  }
 }

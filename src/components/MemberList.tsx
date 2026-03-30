@@ -4,10 +4,11 @@ import MemberCard from './MemberCard'
 import MemberTable from './MemberTable'
 import ManagePlayerGroupModal from './ManagePlayerGroupModal'
 import Button from './ui/Button'
+import Modal from './ui/Modal'
 import { fetchGuildId, fetchGuildBasic } from '../services/mapleApiService'
 import { getOrFetchCharacter } from '../services/characterCacheService'
 import { getAltNamesMap } from '../services/altLinkService'
-import { getNobleMap, setNoble } from '../services/memberDataService'
+import { getNobleMap, setNoble, setNobleBulk } from '../services/memberDataService'
 import {
   getCachedMemberList,
   setCachedMemberList,
@@ -41,6 +42,7 @@ export default function MemberList({ guildName, worldName, canEdit }: Props) {
   const [error, setError]               = useState('')
   const [search, setSearch]             = useState('')
   const [altModal, setAltModal]         = useState<{ characterName: string; altNames: string[] } | null>(null)
+  const [showBulkNobleEdit, setShowBulkNobleEdit] = useState(false)
   const [viewMode, setViewMode]         = useState<'card' | 'table'>('card')
 
   const abortRef = useRef<AbortController | null>(null)
@@ -227,6 +229,30 @@ export default function MemberList({ guildName, worldName, canEdit }: Props) {
     await setNoble(characterName, next)
   }
 
+  async function handleBulkNobleUpdate(characterNames: string[], noble: boolean) {
+    const normalized = Array.from(
+      new Set(characterNames.map((name) => name.trim()).filter(Boolean)),
+    )
+    if (normalized.length === 0) {
+      throw new Error('캐릭터명을 1개 이상 입력해 주세요.')
+    }
+
+    const memberNameSet = new Set(members.map((m) => m.characterName))
+    const matched = normalized.filter((name) => memberNameSet.has(name))
+    const notFound = normalized.filter((name) => !memberNameSet.has(name))
+    if (matched.length === 0) {
+      throw new Error('입력한 이름 중 일치하는 길드원이 없습니다.')
+    }
+
+    await setNobleBulk(matched, noble)
+    const matchedSet = new Set(matched)
+    setMembers((prev) =>
+      prev.map((m) => matchedSet.has(m.characterName) ? { ...m, noble } : m),
+    )
+
+    return { updatedCount: matched.length, notFound }
+  }
+
   return (
     <div>
       {/* 헤더 */}
@@ -354,7 +380,14 @@ export default function MemberList({ guildName, worldName, canEdit }: Props) {
             ))}
           </div>
         ) : (
-          <MemberTable members={filtered} currentGuildName={guildName} onManageGroup={openAltModal} onToggleNoble={handleToggleNoble} canEdit={canEdit} />
+          <MemberTable
+            members={filtered}
+            currentGuildName={guildName}
+            onManageGroup={openAltModal}
+            onToggleNoble={handleToggleNoble}
+            onOpenBulkNobleEdit={() => setShowBulkNobleEdit(true)}
+            canEdit={canEdit}
+          />
         )
       )}
 
@@ -373,6 +406,108 @@ export default function MemberList({ guildName, worldName, canEdit }: Props) {
           onSaved={() => load(false)}
         />
       )}
+      {showBulkNobleEdit && (
+        <BulkNobleEditModal
+          onClose={() => setShowBulkNobleEdit(false)}
+          onApply={handleBulkNobleUpdate}
+        />
+      )}
     </div>
+  )
+}
+
+function BulkNobleEditModal({
+  onClose,
+  onApply,
+}: {
+  onClose: () => void
+  onApply: (characterNames: string[], noble: boolean) => Promise<{ updatedCount: number; notFound: string[] }>
+}) {
+  const [rawNames, setRawNames] = useState('')
+  const [target, setTarget]     = useState<'O' | 'X'>('O')
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState('')
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    const names = Array.from(
+      new Set(rawNames.split(/[\n,]/).map((name) => name.trim()).filter(Boolean)),
+    )
+    if (names.length === 0) {
+      setError('캐릭터명을 1개 이상 입력해 주세요.')
+      return
+    }
+
+    setLoading(true)
+    setError('')
+    try {
+      const result = await onApply(names, target === 'O')
+      const summary = `노블 ${target}로 ${result.updatedCount}명 반영했습니다.`
+      if (result.notFound.length > 0) {
+        alert(`${summary}\n미일치 ${result.notFound.length}명: ${result.notFound.slice(0, 5).join(', ')}${result.notFound.length > 5 ? ' 외' : ''}`)
+      } else {
+        alert(summary)
+      }
+      onClose()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '일괄 수정 중 오류가 발생했습니다.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <Modal title="노블 일괄 수정" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">캐릭터명</label>
+          <textarea
+            value={rawNames}
+            onChange={(e) => setRawNames(e.target.value)}
+            placeholder={'캐릭터명1\n캐릭터명2, 캐릭터명3'}
+            rows={6}
+            className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-amber-400"
+          />
+          <p className="mt-1 text-xs text-gray-400">줄바꿈 또는 콤마(,)로 여러 명을 입력할 수 있습니다.</p>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-gray-700">반영 값</label>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setTarget('O')}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors ${
+                target === 'O'
+                  ? 'border-amber-300 bg-amber-100 text-amber-700'
+                  : 'border-gray-300 bg-white text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              O
+            </button>
+            <button
+              type="button"
+              onClick={() => setTarget('X')}
+              className={`rounded-lg border px-3 py-1.5 text-sm font-semibold transition-colors ${
+                target === 'X'
+                  ? 'border-gray-400 bg-gray-100 text-gray-700'
+                  : 'border-gray-300 bg-white text-gray-500 hover:bg-gray-50'
+              }`}
+            >
+              X
+            </button>
+          </div>
+        </div>
+
+        {error && <p className="text-sm text-red-500">{error}</p>}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="secondary" onClick={onClose}>취소</Button>
+          <Button type="submit" disabled={loading}>
+            {loading ? '반영 중...' : '일괄 반영'}
+          </Button>
+        </div>
+      </form>
+    </Modal>
   )
 }
