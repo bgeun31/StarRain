@@ -24,6 +24,7 @@ interface Props {
   guildName: string
   worldName: string
   canEdit: boolean
+  onInitialLoadDone?: () => void
 }
 
 function formatAge(ms: number): string {
@@ -33,7 +34,7 @@ function formatAge(ms: number): string {
   return `${Math.floor(min / 60)}시간 전`
 }
 
-export default function MemberList({ guildName, worldName, canEdit }: Props) {
+export default function MemberList({ guildName, worldName, canEdit, onInitialLoadDone }: Props) {
   const { profile } = useAuth()
   const [guildInfo, setGuildInfo]       = useState<NexonGuildBasic | null>(null)
   const [members, setMembers]           = useState<MemberView[]>([])
@@ -199,8 +200,12 @@ export default function MemberList({ guildName, worldName, canEdit }: Props) {
       setSyncing(false)
       const msg = err instanceof Error ? err.message : '알 수 없는 오류'
       setError(msg)
+    } finally {
+      if (!signal.aborted) {
+        onInitialLoadDone?.()
+      }
     }
-  }, [guildName, worldName])
+  }, [guildName, worldName, onInitialLoadDone])
 
   useEffect(() => {
     load()

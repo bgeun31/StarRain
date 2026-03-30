@@ -1,4 +1,5 @@
-import { Trash2, Shield } from 'lucide-react'
+import { useState } from 'react'
+import { Trash2, Shield, GripVertical } from 'lucide-react'
 import type { SavedGuild } from '../types'
 
 interface Props {
@@ -6,9 +7,30 @@ interface Props {
   selectedId: string | null
   onSelect: (guild: SavedGuild) => void
   onRemove?: (guild: SavedGuild) => void
+  onReorder?: (orderedIds: string[]) => void
 }
 
-export default function GuildSelector({ guilds, selectedId, onSelect, onRemove }: Props) {
+export default function GuildSelector({ guilds, selectedId, onSelect, onRemove, onReorder }: Props) {
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [overId, setOverId] = useState<string | null>(null)
+
+  function moveBefore(ids: string[], fromId: string, toId: string): string[] {
+    const from = ids.indexOf(fromId)
+    const to = ids.indexOf(toId)
+    if (from < 0 || to < 0 || from === to) return ids
+    const next = [...ids]
+    const [picked] = next.splice(from, 1)
+    next.splice(to, 0, picked)
+    return next
+  }
+
+  function handleDrop(targetId: string) {
+    if (!onReorder || !dragId || dragId === targetId) return
+    const ids = guilds.map((g) => g.id)
+    const nextIds = moveBefore(ids, dragId, targetId)
+    onReorder(nextIds)
+  }
+
   if (guilds.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-gray-300 p-5 text-center text-sm text-gray-400">
@@ -24,14 +46,41 @@ export default function GuildSelector({ guilds, selectedId, onSelect, onRemove }
       {guilds.map((g) => (
         <li key={g.id}>
           <div
+            onClick={() => onSelect(g)}
+            draggable={Boolean(onReorder)}
+            onDragStart={() => setDragId(g.id)}
+            onDragOver={(e) => {
+              if (!onReorder) return
+              e.preventDefault()
+              setOverId(g.id)
+            }}
+            onDragLeave={() => setOverId((prev) => (prev === g.id ? null : prev))}
+            onDrop={(e) => {
+              e.preventDefault()
+              handleDrop(g.id)
+              setDragId(null)
+              setOverId(null)
+            }}
+            onDragEnd={() => {
+              setDragId(null)
+              setOverId(null)
+            }}
             className={`group flex cursor-pointer items-center justify-between rounded-lg px-3 py-2.5 transition-colors ${
               selectedId === g.id
                 ? 'bg-amber-500 text-white'
                 : 'hover:bg-gray-100 text-gray-700'
+            } ${
+              overId === g.id && dragId !== g.id
+                ? 'ring-2 ring-amber-300 ring-inset'
+                : ''
             }`}
-            onClick={() => onSelect(g)}
           >
             <div className="flex min-w-0 items-center gap-2">
+              {onReorder && (
+                <span className={`shrink-0 ${selectedId === g.id ? 'text-amber-100' : 'text-gray-300'}`} title="드래그 정렬">
+                  <GripVertical size={14} />
+                </span>
+              )}
               <GuildIcon icon={g.icon} guildName={g.guildName} selected={selectedId === g.id} />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium">{g.guildName}</p>

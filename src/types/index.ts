@@ -20,6 +20,7 @@ export interface SavedGuild {
   guildName: string
   worldName: string
   icon?: string
+  order?: number
   createdAt: Timestamp
 }
 

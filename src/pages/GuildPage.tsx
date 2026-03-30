@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react'
-import { Shield, Bookmark, Users, LogOut, ClipboardList } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Shield, Bookmark, Users, LogOut, ClipboardList, RefreshCw } from 'lucide-react'
 
 import GuildSearchBar from '../components/GuildSearchBar'
 import GuildSelector from '../components/GuildSelector'
 import MemberList from '../components/MemberList'
-import { fetchSavedGuilds, saveGuild, removeSavedGuild } from '../services/savedGuildService'
+import { fetchSavedGuilds, saveGuild, removeSavedGuild, updateSavedGuildOrder } from '../services/savedGuildService'
 import { writeAuditLogSilently } from '../services/auditLogService'
 import { useAuth } from '../contexts/AuthContext'
 import type { SavedGuild } from '../types'
@@ -25,6 +25,7 @@ export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
   const [activeGuild, setActiveGuild]         = useState<ActiveGuild | null>(null)
   const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null)
   const [searching, setSearching]             = useState(false)
+  const [memberLoading, setMemberLoading]     = useState(false)
 
   useEffect(() => { loadSaved() }, [])
 
@@ -38,6 +39,7 @@ export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
   }
 
   function handleSearch(guildName: string, worldName: string) {
+    setMemberLoading(true)
     setActiveGuild({ guildName, worldName })
     setSelectedSavedId(null)
     setSearching(false)
@@ -91,8 +93,42 @@ export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
   }
 
   function handleSelectSaved(guild: SavedGuild) {
+    setMemberLoading(true)
     setSelectedSavedId(guild.id)
     setActiveGuild({ guildName: guild.guildName, worldName: guild.worldName })
+  }
+
+  const handleMembersLoaded = useCallback(() => {
+    setMemberLoading(false)
+  }, [])
+
+  async function handleReorderSavedGuilds(orderedIds: string[]) {
+    const idSet = new Set(orderedIds)
+    const reordered = orderedIds
+      .map((id) => savedGuilds.find((g) => g.id === id))
+      .filter((g): g is SavedGuild => Boolean(g))
+    const untouched = savedGuilds.filter((g) => !idSet.has(g.id))
+    const next = [...reordered, ...untouched]
+
+    setSavedGuilds(next)
+    try {
+      await updateSavedGuildOrder(next.map((g) => g.id))
+      writeAuditLogSilently({
+        action: 'savedGuild.reorder',
+        message: `즐겨찾기 순서 변경: ${next.length}개`,
+        targetType: 'savedGuild',
+        targetId: 'list',
+        actor: {
+          uid: profile?.uid,
+          email: profile?.email,
+          name: profile?.displayName,
+        },
+        meta: { orderedIds: next.map((g) => g.id) },
+      })
+    } catch (err) {
+      console.error(err)
+      await loadSaved()
+    }
   }
 
   return (
@@ -169,18 +205,28 @@ export default function GuildPage({ onNavigateUsers, onNavigateAudit }: Props) {
             selectedId={selectedSavedId}
             onSelect={handleSelectSaved}
             onRemove={canEdit ? handleRemoveSaved : undefined}
+            onReorder={canEdit ? handleReorderSavedGuilds : undefined}
           />
         </aside>
 
         {/* 우: 컨텐츠 */}
         <section className="flex-1 min-w-0">
           {activeGuild ? (
-            <MemberList
-              key={`${activeGuild.worldName}-${activeGuild.guildName}`}
-              guildName={activeGuild.guildName}
-              worldName={activeGuild.worldName}
-              canEdit={canEdit}
-            />
+            <div className="relative">
+              {memberLoading && (
+                <div className="mb-4 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                  <RefreshCw size={14} className="animate-spin" />
+                  길드원 정보를 불러오는 중...
+                </div>
+              )}
+              <MemberList
+                key={`${activeGuild.worldName}-${activeGuild.guildName}`}
+                guildName={activeGuild.guildName}
+                worldName={activeGuild.worldName}
+                canEdit={canEdit}
+                onInitialLoadDone={handleMembersLoaded}
+              />
+            </div>
           ) : (
             <div className="flex h-64 flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 text-gray-400">
               <Shield className="mb-3 opacity-25" size={48} />
