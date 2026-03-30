@@ -38,6 +38,7 @@ export default function MemberTable({
 }: Props) {
   const [sortKey, setSortKey] = useState<SortKey>('level')
   const [sortDir, setSortDir] = useState<SortDir>('desc')
+  const [expandedAltRows, setExpandedAltRows] = useState<Record<string, boolean>>({})
 
   function handleSort(key: SortKey) {
     if (sortKey === key) {
@@ -46,6 +47,10 @@ export default function MemberTable({
       setSortKey(key)
       setSortDir(key === 'level' ? 'desc' : 'asc')
     }
+  }
+
+  function toggleAltRow(characterName: string) {
+    setExpandedAltRows((prev) => ({ ...prev, [characterName]: !prev[characterName] }))
   }
 
   const sorted = [...members].sort((a, b) => {
@@ -114,6 +119,7 @@ export default function MemberTable({
             const displayAlts = m.alts.length > 0 ? m.alts.map((a) => a.characterName) : m.linkedAltNames
             const hasAlts = m.linkedAltNames.length > 0
             const isLinkedAlt = Boolean(m.mainCharacterName)
+            const isExpanded = Boolean(expandedAltRows[m.characterName])
 
             return (
               <tr
@@ -192,28 +198,58 @@ export default function MemberTable({
                     : <Badge variant="default">미연결</Badge>
                   }
                 </td>
-                <td className="px-4 py-3">
+                <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                   {displayAlts.length > 0 ? (
-                    <ul className="ml-2 space-y-1 text-gray-600">
-                      {displayAlts.map((name) => {
-                        const alt = m.alts.find((a) => a.characterName === name)
-                        const inOtherGuild = alt && alt.guildName !== currentGuildName
+                    <div className="space-y-1 text-gray-600">
+                      {(() => {
+                        const firstName = displayAlts[0]
+                        const firstAlt = m.alts.find((a) => a.characterName === firstName)
+                        const firstInOtherGuild = firstAlt && firstAlt.guildName !== currentGuildName
                         return (
-                          <li key={name} className="leading-5">
-                            <span className={inOtherGuild ? 'text-orange-500 font-medium' : ''}>
-                              {name}
-                              {alt?.guildName ? (
-                                <span className={`ml-1 ${inOtherGuild ? 'text-orange-400' : 'text-gray-400'}`}>
-                                  ({alt.guildName})
-                                </span>
-                              ) : (
-                                <span className="ml-1 text-gray-300">(조회중)</span>
-                              )}
-                            </span>
-                          </li>
+                          <p className={`leading-5 ${firstInOtherGuild ? 'text-orange-500 font-medium' : ''}`}>
+                            {firstName}
+                            {firstAlt?.guildName ? (
+                              <span className={`ml-1 ${firstInOtherGuild ? 'text-orange-400' : 'text-gray-400'}`}>
+                                ({firstAlt.guildName})
+                              </span>
+                            ) : (
+                              <span className="ml-1 text-gray-300">(조회중)</span>
+                            )}
+                          </p>
                         )
-                      })}
-                    </ul>
+                      })()}
+
+                      {displayAlts.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => toggleAltRow(m.characterName)}
+                          className="text-xs text-amber-600 hover:text-amber-700"
+                        >
+                          {isExpanded ? `접기` : `외 ${displayAlts.length - 1}개 보기`}
+                        </button>
+                      )}
+
+                      {isExpanded && displayAlts.length > 1 && (
+                        <ul className="ml-2 space-y-1">
+                          {displayAlts.slice(1).map((name) => {
+                            const alt = m.alts.find((a) => a.characterName === name)
+                            const inOtherGuild = alt && alt.guildName !== currentGuildName
+                            return (
+                              <li key={name} className={`leading-5 ${inOtherGuild ? 'text-orange-500 font-medium' : ''}`}>
+                                {name}
+                                {alt?.guildName ? (
+                                  <span className={`ml-1 ${inOtherGuild ? 'text-orange-400' : 'text-gray-400'}`}>
+                                    ({alt.guildName})
+                                  </span>
+                                ) : (
+                                  <span className="ml-1 text-gray-300">(조회중)</span>
+                                )}
+                              </li>
+                            )
+                          })}
+                        </ul>
+                      )}
+                    </div>
                   ) : (
                     <span className="text-gray-300">—</span>
                   )}
