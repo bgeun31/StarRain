@@ -110,6 +110,7 @@ export default function MemberTable({
           {sorted.map((m) => {
             const displayAlts = m.alts.length > 0 ? m.alts.map((a) => a.characterName) : m.linkedAltNames
             const hasAlts = m.linkedAltNames.length > 0
+            const isLinkedAlt = Boolean(m.mainCharacterName)
 
             return (
               <tr
@@ -166,7 +167,9 @@ export default function MemberTable({
                   )}
                 </td>
                 <td className="px-4 py-3">
-                  {hasAlts
+                  {isLinkedAlt
+                    ? <Badge variant="guild">본캐: {m.mainCharacterName}</Badge>
+                    : hasAlts
                     ? <Badge variant="main">부캐 있음</Badge>
                     : <Badge variant="default">미연결</Badge>
                   }

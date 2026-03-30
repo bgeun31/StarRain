@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Plus, X } from 'lucide-react'
 import Modal from './ui/Modal'
 import Button from './ui/Button'
-import { setAltNames, deleteAltLink } from '../services/altLinkService'
+import { syncAltNames } from '../services/altLinkService'
 import { writeAuditLogSilently } from '../services/auditLogService'
 import { useAuth } from '../contexts/AuthContext'
 
@@ -44,34 +44,19 @@ export default function ManagePlayerGroupModal({
     setLoading(true)
     setError('')
     try {
-      if (filtered.length === 0) {
-        await deleteAltLink(characterName)
-        writeAuditLogSilently({
-          action: 'altLink.delete',
-          message: `부캐 연결 해제: ${characterName}`,
-          targetType: 'member',
-          targetId: characterName,
-          actor: {
-            uid: profile?.uid,
-            email: profile?.email,
-            name: profile?.displayName,
-          },
-        })
-      } else {
-        await setAltNames(characterName, filtered)
-        writeAuditLogSilently({
-          action: 'altLink.update',
-          message: `부캐 연결 수정: ${characterName} (${filtered.length}명)`,
-          targetType: 'member',
-          targetId: characterName,
-          actor: {
-            uid: profile?.uid,
-            email: profile?.email,
-            name: profile?.displayName,
-          },
-          meta: { altCount: filtered.length, alts: filtered.slice(0, 50) },
-        })
-      }
+      await syncAltNames(characterName, filtered)
+      writeAuditLogSilently({
+        action: 'altLink.sync',
+        message: `부캐 연결 수정: ${characterName} (${filtered.length}명)`,
+        targetType: 'member',
+        targetId: characterName,
+        actor: {
+          uid: profile?.uid,
+          email: profile?.email,
+          name: profile?.displayName,
+        },
+        meta: { altCount: filtered.length, alts: filtered.slice(0, 50), autoMainLinked: true },
+      })
       onSaved()
       onClose()
     } catch (err) {
@@ -86,7 +71,7 @@ export default function ManagePlayerGroupModal({
     <Modal title={`부캐릭터 관리 — ${characterName}`} onClose={onClose}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="text-xs text-gray-500">
-          {characterName}의 부캐릭터 이름을 입력하세요. 비워두고 저장하면 연결이 해제됩니다.
+          {characterName}의 부캐릭터 이름을 입력하세요. 저장하면 입력한 캐릭터는 자동으로 본캐({characterName})와 연결됩니다.
         </p>
 
         <div className="space-y-2">

@@ -20,7 +20,9 @@ export default function MemberCard({ member, currentGuildName, canEdit, onManage
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-semibold text-gray-900">{member.characterName}</span>
             {member.isNew && <Badge variant="alt">신규</Badge>}
-            {member.linkedAltNames.length > 0
+            {member.mainCharacterName
+              ? <Badge variant="guild">본캐: {member.mainCharacterName}</Badge>
+              : member.linkedAltNames.length > 0
               ? <Badge variant="main">부캐 있음</Badge>
               : <Badge variant="default">미연결</Badge>
             }

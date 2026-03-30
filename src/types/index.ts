@@ -74,6 +74,7 @@ export interface MemberView {
   characterLevel: number
   guildName: string
   linkedAltNames: string[]  // DB에 저장된 부캐 이름 목록 (비어있으면 미연결)
+  mainCharacterName?: string // 본캐와 연결된 경우 본캐 이름
   noble: boolean            // 노블레스 여부 (memberData 컬렉션에 저장)
   nobleCount: number        // 노블 누적 횟수 (memberData 컬렉션에 저장)
   isNew: boolean            // 이번 로드에서 새로 감지된 신규 가입자

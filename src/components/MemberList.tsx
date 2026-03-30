@@ -7,7 +7,7 @@ import Button from './ui/Button'
 import Modal from './ui/Modal'
 import { fetchGuildId, fetchGuildBasic } from '../services/mapleApiService'
 import { getOrFetchCharacter } from '../services/characterCacheService'
-import { getAltNamesMap } from '../services/altLinkService'
+import { getAltLinkMaps } from '../services/altLinkService'
 import {
   getNobleMap,
   getNobleCountMap,
@@ -67,11 +67,13 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
     setSyncedAt(cache.cachedAt.toMillis())
     setFromCache(true)
 
-    const [altMap, nobleMap, nobleCountMap] = await Promise.all([
-      getAltNamesMap(cache.memberNames),
+    const [linkMaps, nobleMap, nobleCountMap] = await Promise.all([
+      getAltLinkMaps(cache.memberNames),
       getNobleMap(cache.memberNames),
       getNobleCountMap(cache.memberNames),
     ])
+    const altMap = linkMaps.altMap
+    const mainMap = linkMaps.mainMap
     if (signal.aborted) return true
 
     const views: MemberView[] = cache.members.map((m) => ({
@@ -80,6 +82,7 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
       characterLevel: m.characterLevel,
       guildName: m.guildName ?? guildName,
       linkedAltNames: altMap.get(m.characterName) ?? [],
+      mainCharacterName: mainMap.get(m.characterName),
       noble: nobleMap.get(m.characterName) ?? false,
       nobleCount: nobleCountMap.get(m.characterName) ?? 0,
       isNew: false,
@@ -131,11 +134,13 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
 
     const addedSet = new Set(memberDiff.added)
     const total    = currentNames.length
-    const [altMap, nobleMap, nobleCountMap] = await Promise.all([
-      getAltNamesMap(currentNames),
+    const [linkMaps, nobleMap, nobleCountMap] = await Promise.all([
+      getAltLinkMaps(currentNames),
       getNobleMap(currentNames),
       getNobleCountMap(currentNames),
     ])
+    const altMap = linkMaps.altMap
+    const mainMap = linkMaps.mainMap
     if (signal.aborted) return
 
     setSyncProgress({ loaded: 0, total })
@@ -172,6 +177,7 @@ export default function MemberList({ guildName, worldName, canEdit, onInitialLoa
         characterLevel: info?.character_level ?? 0,
         guildName: info?.character_guild_name ?? guildName,
         linkedAltNames: altNames,
+        mainCharacterName: mainMap.get(name),
         noble: nobleMap.get(name) ?? false,
         nobleCount: nobleCountMap.get(name) ?? 0,
         isNew,
